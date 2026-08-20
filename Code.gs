@@ -1,49 +1,187 @@
 /**
- * Code.gs — entry points and the RPC surface the sidebar calls.
+ * @OnlyCurrentDoc
  *
- * ACE for Google Sheets: a port of the Excel VBA add-in of the same name
- * (PwC, 2002-2012). Original trigger was Ctrl+Shift+A; Sheets only offers
- * Ctrl+Alt+Shift+<1-9> macro slots, so this binds slot 1 and README.md explains
- * the Karabiner mapping that restores the original chord.
+ * Code.gs — entry points and the RPC surface the Scopion sidebar calls.
+ *
+ * Scopion: a formula auditor for Google Sheets, descended from the Excel VBA
+ * add-in "ACE" (PwC, 2002-2012). The Excel original hung off a hotkey;
+ * Marketplace add-ons cannot register shortcuts, so Scopion is a persistent
+ * sidebar that FOLLOWS the grid selection (scopionObserve polling) and gives
+ * arrow-key walking of the reference list once the sidebar has focus.
  */
 
-var SETTING_KEYS = ['showExternal', 'traverseHidden', 'showNamedRanges'];
+var SETTING_KEYS = ['showExternal', 'traverseHidden', 'showNamedRanges', 'followMode'];
 var BLANK_LABEL = '---BLANK CELL---';
 
 function onOpen() {
+  // AuthMode.NONE-safe: menu construction only, no spreadsheet reads.
   SpreadsheetApp.getUi()
-    .createMenu('ACE')
-    .addItem('Audit active cell', 'aceOpen')
+    .createMenu('Scopion')
+    .addItem('Open Scopion', 'showScopionSidebar')
     .addToUi();
 }
 
-/** Macro entry point. Bound to Ctrl+Alt+Shift+1 by appsscript.json. */
-function aceOpen() {
+function onInstall(e) {
+  onOpen(e);
+}
+
+function showScopionSidebar() {
   var html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setTitle('ACE — cell audit');
+    .setTitle('Scopion');
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
+/** Macro alias for the bound-script build (Ctrl+Alt+Shift+1). */
+function scopionOpen() {
+  showScopionSidebar();
+}
+
 // ---------------------------------------------------------------------------
-// Settings (the Excel original stored these as defined names inside the workbook;
-// DocumentProperties is the Apps Script equivalent and does not touch the grid)
+// Settings (DocumentProperties; the Excel original used workbook defined names)
 // ---------------------------------------------------------------------------
 
-function aceGetSettings() {
-  var props = PropertiesService.getDocumentProperties();
+function scopionGetSettings() {
   var out = {};
+  var props = null;
+  try {
+    props = PropertiesService.getDocumentProperties();
+  } catch (e) {
+    // view-only access: no document properties, fall through to defaults
+  }
   for (var i = 0; i < SETTING_KEYS.length; i++) {
-    var raw = props.getProperty('ace.' + SETTING_KEYS[i]);
+    var raw = props ? props.getProperty('scopion.' + SETTING_KEYS[i]) : null;
     out[SETTING_KEYS[i]] = raw === null ? true : raw === 'true';
   }
   return out;
 }
 
-function aceSetSetting(key, value) {
+function scopionSetSetting(key, value) {
   if (SETTING_KEYS.indexOf(key) < 0) throw new Error('Unknown setting: ' + key);
-  PropertiesService.getDocumentProperties()
-    .setProperty('ace.' + key, value ? 'true' : 'false');
-  return aceGetSettings();
+  // Best-effort: a viewer without edit rights cannot persist settings; the
+  // sidebar keeps its in-memory state, so failing loudly here would only
+  // break the toggle for read-only users.
+  try {
+    PropertiesService.getDocumentProperties()
+      .setProperty('scopion.' + key, value ? 'true' : 'false');
+  } catch (e) {}
+  return scopionGetSettings();
+}
+
+// ---------------------------------------------------------------------------
+// Selection identity: sheetId:row:col. Immutable against sheet renames, which
+// a name-keyed protocol would silently mis-resolve mid-session.
+// ---------------------------------------------------------------------------
+
+function sheetById(ss, sheetId) {
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === sheetId) return sheets[i];
+  }
+  return null;
+}
+
+function selectionInfo(ss) {
+  var range = ss.getActiveRange();
+  if (!range) return null;
+  var sheet = range.getSheet();
+  var cell = range.getCell(1, 1); // multi-cell selections audit the top-left
+  return {
+    key: sheet.getSheetId() + ':' + cell.getRow() + ':' + cell.getColumn(),
+    sheetId: sheet.getSheetId(),
+    sheetName: sheet.getName(),
+    row: cell.getRow(),
+    column: cell.getColumn(),
+    a1: cell.getA1Notation(),
+    isSingleCell: range.getNumRows() === 1 && range.getNumColumns() === 1
+  };
+}
+
+/**
+ * The follow-mode poll. Cheap when nothing changed; when the selection HAS
+ * changed it captures the coordinates and returns the full audit in the same
+ * round trip — a separate peek-then-audit pair would race against the user
+ * moving again in between.
+ */
+function scopionObserve(request) {
+  var ss = SpreadsheetApp.getActive();
+  var sel = selectionInfo(ss);
+  if (!sel) return { changed: false, selection: null };
+  if (request && request.knownKey === sel.key) {
+    return { changed: false, selection: { key: sel.key } };
+  }
+  var audit = scopionAuditCore({
+    sheetName: sel.sheetName,
+    a1: sel.a1,
+    mode: request && request.mode
+  });
+  return { changed: true, selection: sel, audit: audit };
+}
+
+/**
+ * Navigation. action "jump" moves the grid selection only (arrow-key walking);
+ * "navigateAndAudit" moves it AND audits the target as the new origin in one
+ * round trip (Enter drill-in / Back).
+ */
+function scopionNavigate(request) {
+  if (!request || (request.action !== 'jump' && request.action !== 'navigateAndAudit')) {
+    throw new Error('Unknown navigation action.');
+  }
+  var ss = SpreadsheetApp.getActive();
+  var sheet = sheetById(ss, request.target.sheetId);
+  if (!sheet) throw new Error('Sheet no longer exists.');
+  var row = Math.floor(request.target.row);
+  var column = Math.floor(request.target.column);
+  if (!(row >= 1) || !(column >= 1) ||
+      row > sheet.getMaxRows() || column > sheet.getMaxColumns()) {
+    throw new Error('Target is outside the grid.');
+  }
+
+  var unhidden = false;
+  if (sheet.isSheetHidden()) {
+    sheet.showSheet();
+    unhidden = true;
+  }
+  sheet.activate();
+  var range = sheet.getRange(row, column);
+  ss.setActiveRange(range);
+
+  var selection = {
+    key: sheet.getSheetId() + ':' + row + ':' + column,
+    sheetId: sheet.getSheetId(),
+    sheetName: sheet.getName(),
+    row: row,
+    column: column,
+    a1: range.getA1Notation(),
+    sheetWasUnhidden: unhidden
+  };
+
+  if (request.action === 'navigateAndAudit') {
+    return {
+      selection: selection,
+      audit: scopionAuditCore({
+        sheetName: sheet.getName(),
+        a1: range.getA1Notation(),
+        mode: request.mode
+      })
+    };
+  }
+  return { selection: selection };
+}
+
+/** Mode switches / refresh on the current origin (no navigation). */
+function scopionAudit(request) {
+  // Prefer the immutable target: a sheetName captured before a rename would
+  // resolve to "No such sheet" even though the sheet still exists.
+  if (request && request.target && request.target.sheetId != null) {
+    var sheet = sheetById(SpreadsheetApp.getActive(), request.target.sheetId);
+    if (!sheet) throw new Error('Sheet no longer exists.');
+    return scopionAuditCore({
+      sheetName: sheet.getName(),
+      a1: sheet.getRange(request.target.row, request.target.column).getA1Notation(),
+      mode: request.mode
+    });
+  }
+  return scopionAuditCore(request);
 }
 
 // ---------------------------------------------------------------------------
@@ -54,10 +192,10 @@ function aceSetSetting(key, value) {
  * @param {?Object} request {sheetName, a1, mode} — omit to audit the current
  *   selection. `mode` is 'precedents' or 'dependents'.
  */
-function aceAudit(request) {
+function scopionAuditCore(request) {
   var started = Date.now();
   var ss = SpreadsheetApp.getActive();
-  var settings = aceGetSettings();
+  var settings = scopionGetSettings();
   var mode = (request && request.mode) === 'dependents' ? 'dependents' : 'precedents';
 
   var sheetName, a1;
@@ -106,10 +244,36 @@ function aceAudit(request) {
 
   var rows = materializeRows(ss, targets, visible);
 
+  // Navigation identity for each row (sheetId:row:col of the row's top-left).
+  var idBySheet = {};
+  var allSheets = ss.getSheets();
+  for (var sIdx = 0; sIdx < allSheets.length; sIdx++) {
+    idBySheet[allSheets[sIdx].getName()] = allSheets[sIdx].getSheetId();
+  }
+  for (var rIdx = 0; rIdx < rows.length; rIdx++) {
+    var rw = rows[rIdx];
+    if (rw.external || !rw.jumpable) continue;
+    var box = a1ToRect(rw.address, rw.sheetName);
+    if (box && idBySheet[rw.sheetName] !== undefined) {
+      rw.target = { sheetId: idBySheet[rw.sheetName], row: box.r1, column: box.c1 };
+    } else {
+      rw.jumpable = false;
+    }
+  }
+
+  var originSheetId = null;
+  var origSheets = ss.getSheets();
+  for (var oIdx = 0; oIdx < origSheets.length; oIdx++) {
+    if (origSheets[oIdx].getName() === sheetName) { originSheetId = origSheets[oIdx].getSheetId(); break; }
+  }
+  var originBox = a1ToRect(a1, sheetName);
   return {
     origin: {
       sheetName: sheetName,
+      sheetId: originSheetId,
       a1: a1,
+      key: originSheetId + ':' + originBox.r1 + ':' + originBox.c1,
+      target: { sheetId: originSheetId, row: originBox.r1, column: originBox.c1 },
       formula: found.formula || '',
       value: displayValue(originCell)
     },
@@ -303,38 +467,19 @@ function displayValue(range) {
 // Navigation
 // ---------------------------------------------------------------------------
 
-/**
- * Move the selection to a target. The Excel original coloured the cell green and
- * restored the old colour on the way out; here the native selection outline does
- * that job, so the document is never written to for highlighting.
- *
- * A hidden sheet is the one case that needs a write: Sheets cannot activate a
- * hidden sheet. The sheet is unhidden and the fact is reported, so the sidebar
- * can tell the user their document changed.
- */
-function aceJump(sheetName, a1) {
-  var ss = SpreadsheetApp.getActive();
-  var validated = validateTarget(ss, sheetName, a1);
-  var sheet = ss.getSheetByName(validated.sheetName);
-  var unhidden = false;
-
-  if (sheet.isSheetHidden()) {
-    sheet.showSheet();
-    unhidden = true;
-  }
-  sheet.activate();
-  // The address may be a whole column ("C:C") or row ("5:5"), which getRange()
-  // rejects in that form. Select the range's top-left cell instead.
-  var target = a1ToRect(validated.a1, validated.sheetName);
-  var range = sheet.getRange(target.r1, target.c1);
-  ss.setActiveRange(range);
-
-  return { sheetName: validated.sheetName, a1: range.getA1Notation(), unhidden: unhidden };
-}
-
 /** Re-hide sheets this session unhid, when the user asks to undo that. */
-function aceRehide(sheetNames) {
+function scopionRehide(sheetNames, originTarget) {
   var ss = SpreadsheetApp.getActive();
+  // After walking into a hidden sheet, that sheet IS the active sheet and
+  // could never be re-hidden. Return to the audit origin first.
+  if (originTarget && originTarget.sheetId != null) {
+    var origin = sheetById(ss, originTarget.sheetId);
+    if (origin && !origin.isSheetHidden() &&
+        sheetNames.indexOf(origin.getName()) < 0) {
+      origin.activate();
+      ss.setActiveRange(origin.getRange(originTarget.row, originTarget.column));
+    }
+  }
   var activeName = ss.getActiveSheet().getName();
   var rehidden = [];
   for (var i = 0; i < sheetNames.length; i++) {

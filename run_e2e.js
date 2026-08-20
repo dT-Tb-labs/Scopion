@@ -24,6 +24,8 @@ class Range {
   getRow() { return this.r1; } getColumn() { return this.c1; }
   getLastRow() { return this.r1 + this.nr - 1; } getLastColumn() { return this.c1 + this.nc - 1; }
   getCell(r, c) { return new Range(this.sheet, this.r1 + r - 1, this.c1 + c - 1, 1, 1); }
+  getNumRows() { return this.nr; }
+  getNumColumns() { return this.nc; }
   getA1Notation() {
     const a = colToA(this.c1) + this.r1, b = colToA(this.c1 + this.nc - 1) + (this.r1 + this.nr - 1);
     return a === b ? a : a + ':' + b;
@@ -46,7 +48,11 @@ class Range {
 }
 
 class Sheet {
-  constructor(name, cells, hidden) { this.name = name; this.cells = cells; this.hidden = !!hidden; }
+  constructor(name, cells, hidden) {
+    this.name = name; this.cells = cells; this.hidden = !!hidden;
+    this.sheetId = [...name].reduce((a, c) => a * 31 + c.charCodeAt(0) & 0xffff, 7);
+  }
+  getSheetId() { return this.sheetId; }
   _cell(r, c) { return (this.cells[r] && this.cells[r][c]) || { formula: '', value: '', background: '#ffffff' }; }
   getName() { return this.name; }
   isSheetHidden() { return this.hidden; }
@@ -152,76 +158,114 @@ function check(label, actual, expected) {
 function addrs(res) { return res.rows.map((r) => r.sheetName + '!' + r.address); }
 
 console.log('precedents');
-let res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A1', mode: 'precedents' });
+let res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A1', mode: 'precedents' });
 check('plain cross-sheet refs', addrs(res), ['Inputs!B2', 'Inputs!B1']);
 check('no blank alert', res.hasBlank, false);
 
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A2', mode: 'precedents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A2', mode: 'precedents' });
 check('OFFSET into a hidden sheet resolves', addrs(res),
   ["Hidden Calc!A1", 'Inputs!B3', "Hidden Calc!A2"]);
 check('the hidden sheet is flagged H', res.rows.filter((r) => r.flag === 'H').map((r) => r.address), ['A1', 'A2']);
 
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A3', mode: 'precedents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A3', mode: 'precedents' });
 check('INDEX target', addrs(res), ['Inputs!B1:B4', 'Inputs!B4']);
 check('an empty INDEX target raises the blank alert', res.hasBlank, true);
 check('and is labelled', res.rows[1].value, '---BLANK CELL---');
 
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A5', mode: 'precedents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A5', mode: 'precedents' });
 check('INDIRECT with a literal', addrs(res), ['Inputs!B2']);
 
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A6', mode: 'precedents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A6', mode: 'precedents' });
 check('SUM is not double-counted', addrs(res), ['Inputs!B1:B3']);
 
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A7', mode: 'precedents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A7', mode: 'precedents' });
 check('an unresolvable OFFSET is reported, not dropped', res.unresolved.length, 1);
 check('with the offending text', res.unresolved[0].raw, 'OFFSET(Inputs!B1,MATCH(1,Inputs!A:A,0),0)');
 
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A8', mode: 'precedents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A8', mode: 'precedents' });
 check('a named range used as an OFFSET argument resolves', addrs(res),
   ["Hidden Calc!A1", 'Inputs!B3', "Hidden Calc!A2"]);
 check('and is not reported as unresolvable', res.unresolved.length, 0);
 
 console.log('named ranges');
-res = sandbox.aceAudit({ sheetName: 'Inputs', a1: 'B1', mode: 'precedents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B1', mode: 'precedents' });
 check('the covering name is reported', res.namedRanges, ['Growth']);
 
 console.log('dependents');
-res = sandbox.aceAudit({ sheetName: 'Inputs', a1: 'B2', mode: 'dependents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B2', mode: 'dependents' });
 check('every reader of Inputs!B2, including the ranges covering it',
   addrs(res).sort(), ['Model!A1', 'Model!A3', 'Model!A5', 'Model!A6'].sort());
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A1', mode: 'dependents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A1', mode: 'dependents' });
 check('a same-sheet reader', addrs(res), ['Model!A4']);
-res = sandbox.aceAudit({ sheetName: 'Inputs', a1: 'B3', mode: 'dependents' });
+res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B3', mode: 'dependents' });
 check('a reader through an OFFSET argument', addrs(res).sort(),
   ['Model!A2', 'Model!A3', 'Model!A6', 'Model!A8'].sort());
 
 console.log('settings');
-sandbox.aceSetSetting('traverseHidden', false);
-res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A2', mode: 'precedents' });
+sandbox.scopionSetSetting('traverseHidden', false);
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A2', mode: 'precedents' });
 check('hidden-sheet rows drop out when the toggle is off', addrs(res), ['Inputs!B3']);
-sandbox.aceSetSetting('traverseHidden', true);
+sandbox.scopionSetSetting('traverseHidden', true);
 
-console.log('navigation');
-const jump = sandbox.aceJump('Hidden Calc', 'A2');
-check('jumping unhides', jump.unhidden, true);
-check('and reports the cell', jump.a1, 'A2');
+console.log('navigation (scopionNavigate)');
+const hid = ss.getSheetByName('Hidden Calc');
+const nav = sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hid.getSheetId(), row: 2, column: 1 } });
+check('jumping unhides', nav.selection.sheetWasUnhidden, true);
+check('and reports the key', nav.selection.key, hid.getSheetId() + ':2:1');
 check('the selection moved', ss.getActiveRange().getA1Notation(), 'A2');
-check('re-hiding works', sandbox.aceRehide(['Hidden Calc']), []); // active sheet is skipped
-sandbox.aceJump('Model', 'A1');
-check('re-hiding once off the sheet', sandbox.aceRehide(['Hidden Calc']), ['Hidden Calc']);
+check('re-hiding skips the active sheet', sandbox.scopionRehide(['Hidden Calc']), []);
+const modelSheet = ss.getSheetByName('Model');
+const nav2 = sandbox.scopionNavigate({ action: 'navigateAndAudit', target: { sheetId: modelSheet.getSheetId(), row: 6, column: 2 }, mode: 'precedents' });
+check('navigateAndAudit returns the audit in one round trip',
+  nav2.audit.origin.sheetName + '!' + nav2.audit.origin.a1, 'Model!B6');
+check('audit rows carry navigation targets',
+  nav2.audit.rows.every((r) => r.external || !r.jumpable || (r.target && r.target.sheetId != null)), true);
+check('re-hiding once off the sheet', sandbox.scopionRehide(['Hidden Calc']), ['Hidden Calc']);
+
+console.log('observe (follow-mode poll)');
+ss.setActiveRange(modelSheet.getRange('B6'));
+const obs1 = sandbox.scopionObserve({ knownKey: null, mode: 'precedents' });
+check('first observe audits', obs1.changed, true);
+check('and reports the selection key', obs1.selection.key, modelSheet.getSheetId() + ':6:2');
+check('the audit is the audit of the selection', obs1.audit.origin.a1, 'B6');
+const obs2 = sandbox.scopionObserve({ knownKey: obs1.selection.key, mode: 'precedents' });
+check('unchanged selection is cheap', obs2.changed, false);
+ss.setActiveRange(modelSheet.getRange('B9'));
+const obs3 = sandbox.scopionObserve({ knownKey: obs1.selection.key, mode: 'precedents' });
+check('a changed selection re-audits', obs3.changed && obs3.audit.origin.a1, 'B9');
+ss.setActiveRange(modelSheet.getRange(1, 1, 3, 2));
+const obs4 = sandbox.scopionObserve({ knownKey: null, mode: 'precedents' });
+check('a multi-cell selection audits the top-left', obs4.selection.a1, 'A1');
+check('and says so', obs4.selection.isSingleCell, false);
+
+console.log('review fixes');
+let badAction = '';
+try { sandbox.scopionNavigate({ action: 'teleport', target: { sheetId: modelSheet.getSheetId(), row: 1, column: 1 } }); } catch (e) { badAction = e.message; }
+check('an unknown navigation action is rejected', badAction.indexOf('Unknown navigation action') === 0, true);
+
+const byTarget = sandbox.scopionAudit({ target: { sheetId: modelSheet.getSheetId(), row: 6, column: 2 }, mode: 'precedents' });
+check('scopionAudit resolves an immutable target', byTarget.origin.sheetName + '!' + byTarget.origin.a1, 'Model!B6');
+
+// re-hide is a no-op while standing ON the hidden sheet unless the origin hop works
+sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hid.getSheetId(), row: 1, column: 1 } });
+check('we are standing on the hidden sheet', ss.getActiveSheet().getName(), 'Hidden Calc');
+const rehidden = sandbox.scopionRehide(['Hidden Calc'], { sheetId: modelSheet.getSheetId(), row: 7, column: 2 });
+check('re-hide hops to the origin and actually hides', rehidden, ['Hidden Calc']);
+check('the selection is back at the origin', ss.getActiveRange().getA1Notation(), 'B7');
 
 console.log('grid bounds');
 let outOfGrid = '';
-try { sandbox.aceJump('Model', 'A5000'); } catch (e) { outOfGrid = e.message; }
-check('a cell past the grid is refused instead of throwing inside getRange',
-  outOfGrid.indexOf('outside the grid') > 0, true);
+try {
+  sandbox.scopionNavigate({ action: 'jump', target: { sheetId: ss.getSheetByName('Model').getSheetId(), row: 5000, column: 1 } });
+} catch (e) { outOfGrid = e.message; }
+check('a target past the grid is refused', outOfGrid.indexOf('outside the grid') >= 0, true);
+let badSheet = '';
+try { sandbox.scopionNavigate({ action: 'jump', target: { sheetId: 99999, row: 1, column: 1 } }); } catch (e) { badSheet = e.message; }
+check('a dead sheetId is refused', badSheet.indexOf('no longer exists') > 0, true);
 
 console.log('input validation');
 let threw = '';
-try { sandbox.aceJump('Model', 'DROP TABLE'); } catch (e) { threw = e.message; }
-check('a bogus address is rejected', threw.indexOf('Not a valid reference') === 0, true);
-threw = '';
-try { sandbox.aceAudit({ sheetName: 'Nope', a1: 'A1' }); } catch (e) { threw = e.message; }
+try { sandbox.scopionAuditCore({ sheetName: 'Nope', a1: 'A1' }); } catch (e) { threw = e.message; }
 check('a bogus sheet is rejected', threw.indexOf('No such sheet') === 0, true);
 
 console.log(failed ? '\n' + failed + ' e2e check(s) FAILED' : '\nall e2e checks passed');

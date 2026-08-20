@@ -3,213 +3,704 @@
 <head>
 <base target="_top">
 <style>
-  :root { --line: #d9dce0; --muted: #5f6368; --hit: #e8f0fe; }
-  body { font-family: Roboto, Arial, sans-serif; font-size: 12px; margin: 0; padding: 8px; color: #202124; }
-  h2 { font-size: 13px; margin: 0 0 6px; }
-  .origin { background: #f1f3f4; border-radius: 4px; padding: 6px; margin-bottom: 6px; word-break: break-all; }
-  .origin code { font-family: 'Roboto Mono', Menlo, monospace; font-size: 11px; }
-  .names { color: #0b8043; font-weight: 600; margin-bottom: 6px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
-  button { font-size: 12px; padding: 4px 8px; cursor: pointer; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; font-size: 11px; }
-  tbody tr { cursor: pointer; }
-  tbody tr:hover { background: var(--hit); }
-  tbody.blank-alert { background: #ffffcc; }
-  .swatch { display: inline-block; width: 12px; height: 12px; border: 1px solid #999; vertical-align: middle; }
-  .flag { font-weight: 700; color: #c5221f; }
-  .sub { font-family: 'Roboto Mono', Menlo, monospace; font-size: 10px; color: var(--muted); word-break: break-all; }
-  .warn { background: #fce8e6; border-left: 3px solid #c5221f; padding: 5px; margin: 6px 0; }
-  .note { color: var(--muted); font-size: 11px; margin-top: 6px; }
-  .toggles label { display: block; margin: 2px 0; }
-  #status { color: var(--muted); min-height: 14px; }
+  :root {
+    --blue: #1a73e8; --blue-bg: #e8f0fe;
+    --border: #dadce0; --text: #202124; --muted: #5f6368;
+    --surface: #fff; --card: #f8f9fa;
+    --amber: #b06000; --amber-bg: #fef7e0;
+    --red: #c5221f; --red-bg: #fce8e6;
+    --green: #188038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 0 34px;
+    font-family: Roboto, Arial, sans-serif; font-size: 13px;
+    color: var(--text); background: var(--surface); user-select: none;
+  }
+  .mono { font-family: 'Roboto Mono', Menlo, monospace; }
+
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  header .brand { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  header .dot.paused { background: #9aa0a6; }
+  header .dot.error { background: var(--red); }
+  .pill {
+    margin-left: auto; border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 10px; font-size: 11px; cursor: pointer; background: var(--surface);
+  }
+  .pill.on { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+
+  .crumbs {
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    padding: 6px 12px 0; font-size: 11px; color: var(--muted); min-height: 14px;
+  }
+  .crumbs .chip { cursor: pointer; color: var(--blue); }
+  .crumbs .sep { color: var(--border); }
+
+  .origin {
+    margin: 8px 12px; padding: 9px 10px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .origin .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .origin .addr { font-weight: 700; }
+  .origin .val { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .origin .formula {
+    margin-top: 5px; font-size: 11px; padding: 5px 6px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 4px;
+    max-height: 56px; overflow: auto; word-break: break-all; user-select: text;
+  }
+  .origin .names { margin-top: 4px; font-size: 11px; color: var(--green); font-weight: 600; }
+
+  .modes { display: flex; margin: 0 12px 6px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .modes button {
+    flex: 1; border: 0; background: var(--surface); padding: 5px 0; cursor: pointer;
+    font-size: 12px; color: var(--muted);
+  }
+  .modes button.on { background: var(--blue-bg); color: var(--blue); font-weight: 600; }
+
+  .warn { margin: 0 12px 6px; padding: 6px 8px; border-radius: 6px; font-size: 11px; }
+  .warn.amber { background: var(--amber-bg); color: var(--amber); border-left: 3px solid var(--amber); }
+  .warn.red { background: var(--red-bg); color: var(--red); border-left: 3px solid var(--red); }
+  .warn ul { margin: 4px 0 0; padding-left: 16px; }
+  .warn .mono { user-select: text; }
+
+  .listhead {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 2px 12px 4px; font-size: 11px; color: var(--muted);
+  }
+  .hint { color: var(--blue); cursor: pointer; }
+
+  #list { outline: none; margin: 0 8px; }
+  #list.blank-alert { background: #fffbe6; border-radius: 6px; }
+  .row {
+    position: relative; padding: 6px 8px 6px 14px; border-radius: 6px;
+    cursor: pointer; margin-bottom: 2px;
+  }
+  .row:hover { background: #f1f3f4; }
+  .row.active { background: var(--blue-bg); }
+  .row.active::before {
+    content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px;
+    width: 3px; border-radius: 2px; background: var(--blue);
+  }
+  .row .l1 { display: flex; align-items: baseline; gap: 6px; }
+  .row .addr { font-weight: 600; font-size: 12px; }
+  .row .val { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text); }
+  .row .swatch { width: 10px; height: 10px; border: 1px solid #bbb; border-radius: 2px; flex: none; align-self: center; }
+  .badge {
+    font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 3px; flex: none;
+  }
+  .badge.h { background: var(--red-bg); color: var(--red); }
+  .badge.ex { background: #e1bee7; color: #6a1b9a; }
+  .badge.blank { background: var(--amber-bg); color: var(--amber); }
+  .row .l2 {
+    margin-top: 1px; font-size: 10px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row.dead { opacity: .55; cursor: default; }
+
+  .empty { padding: 18px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+
+  .chipbar { margin: 6px 12px; }
+  .chipbar button {
+    border: 1px solid var(--border); background: var(--surface); border-radius: 999px;
+    padding: 3px 10px; font-size: 11px; cursor: pointer; margin-right: 6px;
+  }
+
+  details.opts { margin: 4px 12px; font-size: 11px; color: var(--muted); }
+  details.opts label { display: block; margin: 3px 0; }
+
+  footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 5px 12px; background: var(--card); border-top: 1px solid var(--border);
+    font-size: 10px; color: var(--muted);
+  }
 </style>
 </head>
 <body>
 
-<div class="controls">
-  <label><input type="radio" name="mode" value="precedents" checked> Precedents</label>
-  <label><input type="radio" name="mode" value="dependents"> Dependents</label>
+<header>
+  <span class="dot" id="statusDot"></span>
+  <span class="brand">Scopion</span>
+  <button class="pill on" id="followPill">Follow</button>
+</header>
+
+<div class="crumbs" id="crumbs"></div>
+
+<div class="origin" id="originCard" style="display:none">
+  <div class="top"><span class="addr" id="originAddr"></span><span class="val" id="originVal"></span></div>
+  <div class="formula mono" id="originFormula"></div>
+  <div class="names" id="originNames"></div>
 </div>
 
-<div class="origin">
-  <div><b id="originAddr">-</b></div>
-  <code id="originFormula"></code>
-</div>
-<div class="names" id="names"></div>
-
-<div class="controls">
-  <button id="btnRefresh">New origin</button>
-  <button id="btnBack" disabled>Back</button>
-  <button id="btnRehide" style="display:none">Re-hide sheets</button>
+<div class="modes">
+  <button id="modePrec" class="on">Precedents</button>
+  <button id="modeDep">Dependents</button>
 </div>
 
-<div id="status">Loading…</div>
 <div id="warnings"></div>
 
-<table>
-  <thead>
-    <tr><th>Sheet</th><th></th><th>Address</th><th>Value</th><th></th><th>Source</th></tr>
-  </thead>
-  <tbody id="rows"></tbody>
-</table>
+<div class="listhead">
+  <span id="stats"></span>
+  <span class="hint" id="focusHint" style="display:none">click list → ↑↓ walk</span>
+</div>
 
-<details class="note">
+<div id="list" role="listbox" tabindex="0" aria-label="References"></div>
+
+<div class="chipbar" id="chipbar" style="display:none">
+  <button id="btnRehide">Re-hide sheets</button>
+  <button id="btnHome">Return to origin</button>
+</div>
+
+<details class="opts">
   <summary>Options</summary>
-  <div class="toggles">
-    <label><input type="checkbox" id="showNamedRanges"> Show range names</label>
-    <label><input type="checkbox" id="traverseHidden"> Include hidden sheets</label>
-    <label><input type="checkbox" id="showExternal"> Show external (IMPORTRANGE) refs</label>
-  </div>
+  <label><input type="checkbox" id="showNamedRanges"> Show range names</label>
+  <label><input type="checkbox" id="traverseHidden"> Include hidden sheets</label>
+  <label><input type="checkbox" id="showExternal"> Show IMPORTRANGE refs</label>
 </details>
 
+<footer>
+  <span>↑↓ walk · ⏎ drill · ← back · p/d mode · esc origin</span>
+  <span id="pollLabel">following</span>
+</footer>
+
 <script>
-  var navStack = [];
-  var unhidden = [];
-  var current = null;
+'use strict';
 
-  function mode() {
-    return document.querySelector('input[name=mode]:checked').value;
-  }
+// ---------------------------------------------------------------------------
+// State. One machine: FOLLOWING <-> WALKING, with navigationBusy gating polls.
+// ---------------------------------------------------------------------------
+var S = {
+  mode: 'precedents',
+  audit: null,            // last AuditResult
+  rows: [],               // jumpable view of audit.rows
+  activeIndex: -1,        // roving highlight
+  history: [],            // stack of origin targets {sheetId,row,column}
+  unhidden: [],           // sheet names this session unhid
+  settings: null,
 
-  function setStatus(text) {
-    document.getElementById('status').textContent = text;
-  }
+  // follow loop
+  follow: true,
+  lastSeenKey: null,      // last selection key the poller observed
+  suppressedKey: null,    // our own jump's landing key — poller ignores it
+  echoExpiry: 0,          // transit window: polls landing mid-jump are ignored
+  navCount: 0,            // navigation RPCs in flight (jump+drill can overlap) -> no polling
+  generation: 0,          // bumped by every user navigation; stale polls drop
+  pollTimer: null,
+  pollBusy: false,
+  lastChangeAt: Date.now(),
+  lastInteractAt: Date.now(),
+  failStreak: 0,
+  sleeping: false,
 
-  function audit(request, pushHistory) {
-    setStatus('Scanning…');
-    if (pushHistory && current) navStack.push(current);
-    google.script.run
-      .withSuccessHandler(render)
-      .withFailureHandler(function (e) { setStatus('Error: ' + e.message); })
-      .aceAudit(request);
-  }
+  // jump queue (latest-wins, single flight, never auto-retried)
+  desiredTarget: null,
+  committedTarget: null,
+  jumpInFlight: false,
+  jumpTimer: null
+};
 
-  function render(data) {
-    current = { sheetName: data.origin.sheetName, a1: data.origin.a1, mode: data.mode };
+var POLL_FAST = 800, POLL_WARM = 1500, POLL_IDLE = 4000;
+var WARM_AFTER = 8000, IDLE_AFTER = 30000, SLEEP_AFTER = 15 * 60 * 1000;
 
-    document.getElementById('originAddr').textContent =
-      data.origin.sheetName + '!' + data.origin.a1 + '  =  ' + data.origin.value;
-    document.getElementById('originFormula').textContent = data.origin.formula || '(no formula)';
-    document.getElementById('names').textContent =
-      data.namedRanges.length ? 'RANGE NAME: ' + data.namedRanges.join(' | ') : '';
-
-    for (var key in data.settings) {
-      var el = document.getElementById(key);
-      if (el) el.checked = data.settings[key];
-    }
-
-    var warn = '';
-    if (data.unresolved && data.unresolved.length) {
-      warn += '<div class="warn"><b>Unresolved dynamic references (' +
-        data.unresolved.length + ')</b> — these read cells this tool cannot work out ' +
-        'without evaluating the formula:<ul>';
-      data.unresolved.forEach(function (u) {
-        warn += '<li><code>' + escapeHtml(u.raw) + '</code> — ' + escapeHtml(u.reason) + '</li>';
-      });
-      warn += '</ul></div>';
-    }
-    if (data.skippedSheets && data.skippedSheets.length) {
-      warn += '<div class="warn"><b>Sheets not scanned:</b> ' +
-        escapeHtml(data.skippedSheets.join(', ')) + '</div>';
-    }
-    document.getElementById('warnings').innerHTML = warn;
-
-    var tbody = document.getElementById('rows');
-    tbody.className = data.hasBlank ? 'blank-alert' : '';
-    tbody.innerHTML = '';
-
-    data.rows.forEach(function (row) {
-      var tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td>' + escapeHtml(row.sheetName) + '</td>' +
-        '<td class="flag">' + escapeHtml(row.flag) + '</td>' +
-        '<td>' + escapeHtml(row.address) + '</td>' +
-        '<td>' + escapeHtml(row.value) + '</td>' +
-        '<td><span class="swatch" style="background:' + safeColour(row.background) + '"></span></td>' +
-        '<td class="sub">' + escapeHtml(row.sourceFormula || row.subFormula) +
-          (row.viaName ? ' <b>[' + escapeHtml(row.viaName) + ']</b>' : '') + '</td>';
-      tr.onclick = function () { activate(row); };
-      tbody.appendChild(tr);
-    });
-
-    setStatus(data.scanStats
-      ? data.rows.length + ' dependent(s); scanned ' + data.scanStats.scannedFormulas +
-        ' formulas in ' + data.scanStats.elapsedMs + ' ms'
-      : data.rows.length + ' precedent(s) in ' + data.elapsedMs + ' ms');
-    document.getElementById('btnBack').disabled = navStack.length === 0;
-  }
-
-  function activate(row) {
-    if (row.external) {
-      if (row.url) window.open(row.url, '_blank');
-      else setStatus('That IMPORTRANGE source is not a plain https link.');
-      return;
-    }
-    if (!row.jumpable) return;
-    setStatus('Jumping…');
-    google.script.run
-      .withSuccessHandler(function (res) {
-        if (res.unhidden && unhidden.indexOf(res.sheetName) < 0) {
-          unhidden.push(res.sheetName);
-          document.getElementById('btnRehide').style.display = '';
-        }
-        audit({ sheetName: res.sheetName, a1: res.a1, mode: mode() }, true);
-      })
-      .withFailureHandler(function (e) { setStatus('Error: ' + e.message); })
-      .aceJump(row.sheetName, row.address);
-  }
-
-  function safeColour(value) {
-    return /^#[0-9a-fA-F]{3,8}$/.test(String(value || '')) ? value : 'transparent';
-  }
-
-  function escapeHtml(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
-  document.getElementById('btnRefresh').onclick = function () {
-    audit({ mode: mode() }, true);
-  };
-
-  document.getElementById('btnBack').onclick = function () {
-    var prev = navStack.pop();
-    if (!prev) return;
-    google.script.run
-      .withSuccessHandler(function () {
-        audit({ sheetName: prev.sheetName, a1: prev.a1, mode: mode() }, false);
-      })
-      .aceJump(prev.sheetName, prev.a1);
-  };
-
-  document.getElementById('btnRehide').onclick = function () {
-    google.script.run
-      .withSuccessHandler(function (done) {
-        unhidden = unhidden.filter(function (n) { return done.indexOf(n) < 0; });
-        if (!unhidden.length) document.getElementById('btnRehide').style.display = 'none';
-        setStatus('Re-hid ' + done.length + ' sheet(s).');
-      })
-      .aceRehide(unhidden);
-  };
-
-  Array.prototype.forEach.call(document.querySelectorAll('input[name=mode]'), function (el) {
-    el.onchange = function () { audit(current ? { sheetName: current.sheetName, a1: current.a1, mode: mode() } : { mode: mode() }, false); };
+function rpc(name) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    var runner = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject);
+    runner[name].apply(runner, args);
   });
+}
 
-  ['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
-    document.getElementById(key).onchange = function () {
-      google.script.run
-        .withSuccessHandler(function () {
-          audit(current ? { sheetName: current.sheetName, a1: current.a1, mode: mode() } : { mode: mode() }, false);
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function keyOf(t) { return t ? t.sheetId + ':' + t.row + ':' + t.column : ''; }
+
+// ---------------------------------------------------------------------------
+// Follow loop. Non-overlapping: the next poll is scheduled only after the
+// previous one completes. Cadence adapts to time since the last observed
+// selection change.
+//
+// MEASURED, not assumed: the Apps Script sidebar iframe reports
+// document.hidden === true at all times (sandboxed iframe), so the Page
+// Visibility API can never gate this loop — a hidden-check here halts
+// polling permanently. Background suppression is therefore idle backoff +
+// deep sleep only.
+// ---------------------------------------------------------------------------
+function scheduleNextPoll() {
+  clearTimeout(S.pollTimer);
+  if (!S.follow || S.sleeping) return;
+  var since = Date.now() - S.lastChangeAt;
+  var base = since < WARM_AFTER ? POLL_FAST : since < IDLE_AFTER ? POLL_WARM : POLL_IDLE;
+  var jitter = (Math.random() - 0.5) * 500;
+  S.pollTimer = setTimeout(pollNow, Math.max(300, base + jitter));
+}
+
+function pollNow() {
+  if (!S.follow || S.sleeping || S.navCount > 0 || S.pollBusy) {
+    scheduleNextPoll();
+    return;
+  }
+  if (Date.now() - Math.max(S.lastChangeAt, S.lastInteractAt) > SLEEP_AFTER) {
+    enterSleep();
+    return;
+  }
+  S.pollBusy = true;
+  var gen = S.generation;
+  rpc('scopionObserve', { knownKey: S.lastSeenKey, mode: S.mode })
+    .then(function (res) {
+      S.pollBusy = false;
+      S.failStreak = 0;
+      setStatus('ok');
+      if (gen !== S.generation || !S.follow || !res || !res.selection) { scheduleNextPoll(); return; }
+      var key = res.selection.key;
+      if (!res.changed) { scheduleNextPoll(); return; }
+
+      // Our own jump landing confirms and is remembered.
+      if (key === S.suppressedKey) {
+        S.lastSeenKey = key;
+        scheduleNextPoll();
+        return;
+      }
+      // A foreign key during the transit window is IGNORED WITHOUT being
+      // remembered: advancing lastSeenKey here would make the server report
+      // changed:false forever and freeze the sidebar on a stale origin
+      // (found independently by both external reviewers).
+      if (Date.now() < S.echoExpiry) {
+        scheduleNextPoll();
+        return;
+      }
+
+      // Genuine user move: new origin, new history root.
+      S.lastSeenKey = key;
+      S.suppressedKey = null;
+      S.lastChangeAt = Date.now();
+      S.history = [];
+      acceptAudit(res.audit, /*focusList=*/false);
+      scheduleNextPoll();
+    })
+    .catch(function () {
+      S.pollBusy = false;
+      S.failStreak++;
+      if (S.failStreak >= 3) { setStatus('error'); enterSleep('connection lost — click to retry'); return; }
+      scheduleNextPoll();
+    });
+}
+
+function enterSleep(label) {
+  S.sleeping = true;
+  clearTimeout(S.pollTimer);
+  setStatus('paused');
+  $('pollLabel').textContent = label || 'sleeping — click to resume';
+}
+function wake() {
+  if (!S.sleeping) return;
+  S.sleeping = false;
+  S.failStreak = 0;
+  S.lastInteractAt = Date.now();
+  setStatus(S.follow ? 'ok' : 'paused');
+  $('pollLabel').textContent = S.follow ? 'following' : 'paused';
+  scheduleNextPoll();
+  if (S.follow) pollNow();
+}
+
+['mousemove', 'keydown', 'click'].forEach(function (evt) {
+  document.addEventListener(evt, function () {
+    S.lastInteractAt = Date.now();
+    if (S.sleeping) wake();
+  }, { passive: true });
+});
+
+function setStatus(kind) {
+  var dot = $('statusDot');
+  dot.className = 'dot' + (kind === 'ok' ? '' : kind === 'paused' ? ' paused' : ' error');
+}
+
+// ---------------------------------------------------------------------------
+// Jump queue: highlight moves instantly; at most one navigation RPC in
+// flight; only the newest target is ever sent; a failed jump is dropped, not
+// retried (a late retry would overwrite whatever the user did meanwhile).
+// ---------------------------------------------------------------------------
+function requestJump(target) {
+  S.desiredTarget = target;
+  S.suppressedKey = keyOf(target);
+  S.echoExpiry = Date.now() + 2500;
+  clearTimeout(S.jumpTimer);
+  S.jumpTimer = setTimeout(pumpJumps, 110);
+}
+
+function pumpJumps() {
+  if (S.jumpInFlight || !S.desiredTarget) return;
+  if (keyOf(S.desiredTarget) === keyOf(S.committedTarget)) return;
+  var target = S.desiredTarget;
+  var gen = S.generation;
+  S.jumpInFlight = true;
+  S.navCount++;
+  rpc('scopionNavigate', { action: 'jump', target: target })
+    .then(function (res) {
+      S.jumpInFlight = false;
+      S.navCount--;
+      // A drill/back superseded this walk while it was in flight: its result
+      // must not touch any state (it would move the grid BACK to the older
+      // target and corrupt the suppression keys).
+      if (gen !== S.generation) { scheduleNextPoll(); return; }
+      S.committedTarget = target;
+      S.lastSeenKey = res.selection.key;
+      S.suppressedKey = res.selection.key;
+      if (res.selection.sheetWasUnhidden) noteUnhidden(res.selection.sheetName);
+      // The server-side activate() moves BROWSER focus into the grid, which
+      // would hand the next arrow key to Sheets and end the walk after one
+      // step. The walk owns the keyboard: take focus back.
+      $('list').focus();
+      if (keyOf(S.desiredTarget) !== keyOf(target)) { pumpJumps(); return; }
+      scheduleNextPoll();
+    })
+    .catch(function (e) {
+      S.jumpInFlight = false;
+      S.navCount--;
+      toastError(e);
+      // Never auto-retry the FAILED target, but a NEWER queued target is the
+      // user's latest intent and must still be sent.
+      if (gen === S.generation && S.desiredTarget &&
+          keyOf(S.desiredTarget) !== keyOf(target)) {
+        pumpJumps();
+        return;
+      }
+      scheduleNextPoll();
+    });
+}
+
+function noteUnhidden(name) {
+  if (S.unhidden.indexOf(name) < 0) S.unhidden.push(name);
+  $('chipbar').style.display = '';
+}
+
+// ---------------------------------------------------------------------------
+// Drill / back: one navigateAndAudit round trip. Drilling pushes the current
+// origin; walking never touches history.
+// ---------------------------------------------------------------------------
+/**
+ * historyOp mutates S.history ONLY after the navigation succeeds, so a failed
+ * drill/back never loses breadcrumbs: 'push' records the outgoing origin,
+ * 'pop' drops the entry just returned to, {truncate:n} cuts to a chip.
+ */
+function drill(target, historyOp) {
+  var gen = ++S.generation;
+  S.navCount++;
+  S.desiredTarget = null;
+  clearTimeout(S.jumpTimer);
+  S.suppressedKey = keyOf(target);
+  S.echoExpiry = Date.now() + 2500;
+  var outgoing = S.audit ? S.audit.origin.target : null;
+  rpc('scopionNavigate', { action: 'navigateAndAudit', target: target, mode: S.mode })
+    .then(function (res) {
+      S.navCount--;
+      if (gen !== S.generation) { scheduleNextPoll(); return; }
+      if (historyOp === 'push' && outgoing) S.history.push(outgoing);
+      else if (historyOp === 'pop') S.history.pop();
+      else if (historyOp && historyOp.truncate !== undefined) S.history = S.history.slice(0, historyOp.truncate);
+      S.lastSeenKey = res.selection.key;
+      S.suppressedKey = res.selection.key;
+      S.committedTarget = target;
+      S.lastChangeAt = Date.now();
+      if (res.selection.sheetWasUnhidden) noteUnhidden(res.selection.sheetName);
+      acceptAudit(res.audit, /*focusList=*/true);
+      scheduleNextPoll();
+    })
+    .catch(function (e) {
+      S.navCount--;
+      toastError(e);
+      scheduleNextPoll();
+    });
+}
+
+function goBack() {
+  var prev = S.history[S.history.length - 1];
+  if (prev) drill(prev, 'pop');
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function acceptAudit(audit, focusList) {
+  if (!audit) return;
+  S.audit = audit;
+  S.rows = audit.rows;
+  S.activeIndex = -1;
+  S.committedTarget = null;
+  S.desiredTarget = null;
+
+  var o = audit.origin;
+  $('originCard').style.display = '';
+  $('originAddr').textContent = o.sheetName + '!' + o.a1;
+  $('originVal').textContent = o.value;
+  $('originFormula').textContent = o.formula || '(no formula)';
+  $('originNames').textContent =
+    audit.namedRanges && audit.namedRanges.length ? audit.namedRanges.join(' | ') : '';
+  $('originNames').style.display =
+    audit.namedRanges && audit.namedRanges.length ? '' : 'none';
+
+  renderCrumbs();
+  renderWarnings(audit);
+  renderList(audit);
+  renderStats(audit);
+
+  // Focus policy: sidebar-initiated renders keep keyboard control; a
+  // follow-poll render must never steal focus from the grid.
+  if (focusList) $('list').focus();
+  updateFocusHint();
+}
+
+function renderCrumbs() {
+  var el = $('crumbs');
+  el.innerHTML = '';
+  if (!S.history.length) return;
+  S.history.forEach(function (t, i) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = t.sheetId != null ? shortAddr(t) : '?';
+    chip.onclick = function () { drill(t, { truncate: i }); };
+    el.appendChild(chip);
+    var sep = document.createElement('span');
+    sep.className = 'sep';
+    sep.textContent = '›';
+    el.appendChild(sep);
+  });
+  var cur = document.createElement('span');
+  cur.textContent = S.audit ? S.audit.origin.sheetName + '!' + S.audit.origin.a1 : '';
+  el.appendChild(cur);
+}
+
+function shortAddr(t) { return 'sheet ' + t.sheetId + ' R' + t.row + 'C' + t.column; }
+
+function renderWarnings(audit) {
+  var html = '';
+  if (audit.unresolved && audit.unresolved.length) {
+    html += '<div class="warn amber"><b>Unresolved dynamic references (' +
+      audit.unresolved.length + ')</b><ul>';
+    audit.unresolved.forEach(function (u) {
+      html += '<li><span class="mono">' + esc(u.raw) + '</span> — ' + esc(u.reason) + '</li>';
+    });
+    html += '</ul></div>';
+  }
+  if (audit.skippedSheets && audit.skippedSheets.length) {
+    html += '<div class="warn amber"><b>Not scanned:</b> ' +
+      esc(audit.skippedSheets.join(', ')) + '</div>';
+  }
+  $('warnings').innerHTML = html;
+}
+
+function renderList(audit) {
+  var list = $('list');
+  list.className = audit.hasBlank ? 'blank-alert' : '';
+  list.innerHTML = '';
+
+  if (!audit.rows.length) {
+    list.innerHTML = '<div class="empty">' +
+      (audit.origin.formula ? 'No references found.' :
+        (S.mode === 'precedents' ? 'Not a formula cell.' : 'No dependents found.')) +
+      '</div>';
+    return;
+  }
+
+  audit.rows.forEach(function (row, i) {
+    var el = document.createElement('div');
+    el.className = 'row' + (row.jumpable || row.external ? '' : ' dead');
+    el.id = 'row-' + i;
+    el.setAttribute('role', 'option');
+    var badges = '';
+    if (row.flag === 'H') badges += '<span class="badge h">H</span>';
+    if (row.flag === 'EX') badges += '<span class="badge ex">EX</span>';
+    if (row.isBlank) badges += '<span class="badge blank">BLANK</span>';
+    el.innerHTML =
+      '<div class="l1">' +
+        '<span class="addr">' + esc(row.sheetName + '!' + row.address) + '</span>' + badges +
+        '<span class="val">' + esc(row.isBlank ? '' : row.value) + '</span>' +
+        '<span class="swatch" style="background:' + safeColour(row.background) + '"></span>' +
+      '</div>' +
+      '<div class="l2 mono">' + esc(row.sourceFormula || row.subFormula) +
+        (row.viaName ? ' [' + esc(row.viaName) + ']' : '') + '</div>';
+    el.onclick = function () {
+      $('list').focus();
+      setActive(i, /*jump=*/true);
+    };
+    el.ondblclick = function () { activateRow(i); };
+    list.appendChild(el);
+  });
+}
+
+function renderStats(audit) {
+  var text = audit.rows.length + ' refs · ' + audit.elapsedMs + ' ms';
+  if (audit.scanStats) text += ' · ' + audit.scanStats.scannedFormulas + ' formulas';
+  $('stats').textContent = text;
+}
+
+function safeColour(v) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')) ? v : 'transparent';
+}
+
+function toastError(e) {
+  $('warnings').innerHTML =
+    '<div class="warn red">' + esc(e && e.message || 'failed') + '</div>' +
+    $('warnings').innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard: the list owns arrows while focused. Follow renders never steal
+// focus, so a hint shows how to take control.
+// ---------------------------------------------------------------------------
+function setActive(i, jump) {
+  if (!S.rows.length) return;
+  i = Math.max(0, Math.min(S.rows.length - 1, i));
+  var prev = document.querySelector('.row.active');
+  if (prev) prev.classList.remove('active');
+  S.activeIndex = i;
+  var el = $('row-' + i);
+  if (el) {
+    el.classList.add('active');
+    el.scrollIntoView({ block: 'nearest' });
+    $('list').setAttribute('aria-activedescendant', el.id);
+  }
+  var row = S.rows[i];
+  if (jump && row && row.jumpable && row.target) requestJump(row.target);
+}
+
+function activateRow(i) {
+  var row = S.rows[i];
+  if (!row) return;
+  if (row.external) {
+    if (row.url) window.open(row.url, '_blank');
+    return;
+  }
+  if (row.jumpable && row.target) drill(row.target, 'push');
+}
+
+$('list').addEventListener('keydown', function (ev) {
+  var k = ev.key;
+  if (k === 'ArrowDown' || k === 'j') { setActive(S.activeIndex + 1, true); }
+  else if (k === 'ArrowUp' || k === 'k') { setActive(S.activeIndex - 1, true); }
+  else if (k === 'PageDown') { setActive(S.activeIndex + 10, true); }
+  else if (k === 'PageUp') { setActive(S.activeIndex - 10, true); }
+  else if (k === 'Home') { setActive(0, true); }
+  else if (k === 'End') { setActive(S.rows.length - 1, true); }
+  else if (k === 'Enter' || k === 'ArrowRight') {
+    if (S.activeIndex >= 0) activateRow(S.activeIndex);
+  }
+  else if (k === 'ArrowLeft' || k === 'Backspace') { goBack(); }
+  else if (k === 'Escape') {
+    if (S.audit) requestJump(S.audit.origin.target);
+  }
+  else if (k === 'p') { setMode('precedents'); }
+  else if (k === 'd') { setMode('dependents'); }
+  else return;
+  ev.preventDefault();
+});
+
+window.addEventListener('blur', updateFocusHint);
+window.addEventListener('focus', updateFocusHint);
+$('list').addEventListener('focus', updateFocusHint);
+$('list').addEventListener('blur', function () { setTimeout(updateFocusHint, 50); });
+function updateFocusHint() {
+  var owns = document.activeElement === $('list');
+  $('focusHint').style.display = owns || !S.rows.length ? 'none' : '';
+}
+
+// ---------------------------------------------------------------------------
+// Modes / settings / chips
+// ---------------------------------------------------------------------------
+function setMode(mode) {
+  if (S.mode === mode || !S.audit) return;
+  S.mode = mode;
+  $('modePrec').className = mode === 'precedents' ? 'on' : '';
+  $('modeDep').className = mode === 'dependents' ? 'on' : '';
+  var o = S.audit.origin;
+  var gen = ++S.generation;
+  rpc('scopionAudit', { target: o.target, mode: mode })
+    .then(function (audit) {
+      if (gen !== S.generation) return; // superseded by newer navigation
+      acceptAudit(audit, true);
+    })
+    .catch(toastError);
+}
+$('modePrec').onclick = function () { setMode('precedents'); };
+$('modeDep').onclick = function () { setMode('dependents'); };
+
+$('followPill').onclick = function () {
+  S.follow = !S.follow;
+  this.className = 'pill' + (S.follow ? ' on' : '');
+  $('pollLabel').textContent = S.follow ? 'following' : 'paused';
+  setStatus(S.follow ? 'ok' : 'paused');
+  rpc('scopionSetSetting', 'followMode', S.follow).catch(function () {});
+  if (S.follow) { S.sleeping = false; pollNow(); }
+  else clearTimeout(S.pollTimer);
+};
+
+$('btnRehide').onclick = function () {
+  rpc('scopionRehide', S.unhidden, S.audit ? S.audit.origin.target : null).then(function (done) {
+    S.unhidden = S.unhidden.filter(function (n) { return done.indexOf(n) < 0; });
+    if (!S.unhidden.length) $('chipbar').style.display = 'none';
+  }).catch(toastError);
+};
+
+$('btnHome').onclick = function () {
+  if (S.audit) requestJump(S.audit.origin.target);
+};
+
+['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
+  $(key).onchange = function () {
+    var checked = this.checked;
+    // The save is best-effort: a viewer without edit rights cannot write
+    // DocumentProperties, but the re-audit must still run for them.
+    rpc('scopionSetSetting', key, checked).catch(function () {}).then(function () {
+      if (!S.audit) return;
+      var o = S.audit.origin;
+      var gen = ++S.generation;
+      rpc('scopionAudit', { target: o.target, mode: S.mode })
+        .then(function (audit) {
+          if (gen !== S.generation) return;
+          // Deliberate: a form-control-initiated render does not steal focus
+          // from the control (SOL flagged this against the stated policy;
+          // the policy is refined instead: only LIST-initiated renders focus
+          // the list).
+          acceptAudit(audit, false);
         })
-        .aceSetSetting(key, this.checked);
-    }.bind(document.getElementById(key));
-  });
+        .catch(toastError);
+    });
+  };
+});
 
-  audit(null, false);
+// ---------------------------------------------------------------------------
+// Boot: settings, then first observe (no knownKey -> immediate audit).
+// ---------------------------------------------------------------------------
+$('pollLabel').textContent = 'starting…';
+rpc('scopionGetSettings').then(function (settings) {
+  S.settings = settings;
+  S.follow = settings.followMode !== false;
+  $('followPill').className = 'pill' + (S.follow ? ' on' : '');
+  ['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
+    if ($(key)) $(key).checked = settings[key];
+  });
+  return rpc('scopionObserve', { knownKey: null, mode: S.mode });
+}).then(function (res) {
+  $('pollLabel').textContent = S.follow ? 'following' : 'paused';
+  if (res && res.selection) {
+    S.lastSeenKey = res.selection.key;
+    if (res.audit) acceptAudit(res.audit, true);
+  }
+  scheduleNextPoll();
+}).catch(function (e) {
+  toastError(e);
+  $('pollLabel').textContent = 'boot failed — following will retry';
+  scheduleNextPoll();
+});
 </script>
 </body>
 </html>
