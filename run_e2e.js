@@ -132,10 +132,12 @@ const model = sheetOf('Model', {
   4: { 1: '=A1+A2' },
   5: { 1: '=INDIRECT("Inputs!B2")' },
   6: { 1: '=SUM(Inputs!B1:B3)' },
-  7: { 1: '=OFFSET(Inputs!B1,MATCH(1,Inputs!A:A,0),0)' }
+  7: { 1: '=OFFSET(Inputs!B1,MATCH(1,Inputs!A:A,0),0)' },
+  8: { 1: "=OFFSET('Hidden Calc'!A1,Shift,0)" }
 });
 const ss = new Spreadsheet([model, inputs, hidden], [
-  { getName: () => 'Growth', getRange: () => inputs.getRange('B1') }
+  { getName: () => 'Growth', getRange: () => inputs.getRange('B1') },
+  { getName: () => 'Shift', getRange: () => inputs.getRange('B3') }
 ]);
 sandbox.__ss = ss;
 
@@ -174,6 +176,11 @@ res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A7', mode: 'precedents' });
 check('an unresolvable OFFSET is reported, not dropped', res.unresolved.length, 1);
 check('with the offending text', res.unresolved[0].raw, 'OFFSET(Inputs!B1,MATCH(1,Inputs!A:A,0),0)');
 
+res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A8', mode: 'precedents' });
+check('a named range used as an OFFSET argument resolves', addrs(res),
+  ["Hidden Calc!A1", 'Inputs!B3', "Hidden Calc!A2"]);
+check('and is not reported as unresolvable', res.unresolved.length, 0);
+
 console.log('named ranges');
 res = sandbox.aceAudit({ sheetName: 'Inputs', a1: 'B1', mode: 'precedents' });
 check('the covering name is reported', res.namedRanges, ['Growth']);
@@ -186,7 +193,7 @@ res = sandbox.aceAudit({ sheetName: 'Model', a1: 'A1', mode: 'dependents' });
 check('a same-sheet reader', addrs(res), ['Model!A4']);
 res = sandbox.aceAudit({ sheetName: 'Inputs', a1: 'B3', mode: 'dependents' });
 check('a reader through an OFFSET argument', addrs(res).sort(),
-  ['Model!A2', 'Model!A3', 'Model!A6'].sort());
+  ['Model!A2', 'Model!A3', 'Model!A6', 'Model!A8'].sort());
 
 console.log('settings');
 sandbox.aceSetSetting('traverseHidden', false);

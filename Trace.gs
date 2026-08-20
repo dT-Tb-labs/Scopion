@@ -106,7 +106,7 @@ var DYNAMIC_FUNCS = ['OFFSET', 'INDEX', 'INDIRECT'];
  * more than that (MATCH, QUERY, custom functions...), which the caller reports
  * as an explicitly unresolved row rather than guessing.
  */
-function evalNumericArg(argText, contextSheetName, values) {
+function evalNumericArg(argText, contextSheetName, values, namedRanges) {
   var text = String(argText).trim();
   if (text === '') return null;
 
@@ -116,8 +116,7 @@ function evalNumericArg(argText, contextSheetName, values) {
   var substituted = text;
   for (var i = 0; i < refs.length; i++) {
     var r = refs[i];
-    if (r.kind !== 'ref' || !isFullCellRef(r.a1)) return null;
-    var v = values.get(r.sheet || contextSheetName, r.a1);
+    var v = singleCellValue(r, contextSheetName, values, namedRanges);
     if (typeof v !== 'number') return null;
     // Bounded replace: a plain split on "A1" would also corrupt "A10".
     substituted = replaceRefToken(substituted, r.raw, String(v));
@@ -155,10 +154,30 @@ function resolveRefArg(argText, contextSheetName, values, namedRanges, depth) {
   return refToRect(refs[0], contextSheetName, namedRanges);
 }
 
+/**
+ * The value of a reference that denotes exactly one cell, whether it is written
+ * as an address or as a named range. Named ranges are the normal way a real
+ * model writes an OFFSET argument (OFFSET(Base, Shift, 0)), so refusing them
+ * here reported every such formula as unresolvable.
+ */
+function singleCellValue(ref, contextSheetName, values, namedRanges) {
+  if (ref.kind === 'name') {
+    var nr = (namedRanges || {})[ref.a1.toUpperCase()];
+    if (!nr) return null;
+    var r = nr.rect;
+    if (r.r1 !== r.r2 || r.c1 !== r.c2) return null; // a multi-cell name is not a scalar
+    return values.get(r.sheetName, numToCol(r.c1) + r.r1);
+  }
+  if (ref.kind === 'ref' && isFullCellRef(ref.a1)) {
+    return values.get(ref.sheet || contextSheetName, ref.a1);
+  }
+  return null;
+}
+
 /** OFFSET(A1,,2) is legal: an omitted argument is zero, not an unresolvable one. */
-function blankArgIsZero(argText, contextSheetName, values) {
+function blankArgIsZero(argText, contextSheetName, values, namedRanges) {
   if (argText === undefined || String(argText).trim() === '') return 0;
-  return evalNumericArg(argText, contextSheetName, values);
+  return evalNumericArg(argText, contextSheetName, values, namedRanges);
 }
 
 /**
@@ -279,7 +298,7 @@ ValueCache.prototype.get = function (sheetName, a1) {
 };
 
 /** Evaluate an argument to a reference string, for INDIRECT. */
-function evalTextArg(argText, contextSheetName, values) {
+function evalTextArg(argText, contextSheetName, values, namedRanges) {
   var text = String(argText).trim();
   var pieces = splitTopLevel(text, '&');
   var result = '';
@@ -301,6 +320,11 @@ function evalTextArg(argText, contextSheetName, values) {
       if (qv === null) return null;
       result += String(qv);
       continue;
+    }
+    var named = (namedRanges || {})[p.toUpperCase()];
+    if (named) {
+      var nv = singleCellValue({ kind: 'name', a1: p }, contextSheetName, values, namedRanges);
+      if (nv !== null) { result += String(nv); continue; }
     }
     return null; // needs a function we do not implement
   }
@@ -343,15 +367,15 @@ function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, d
     try {
       if (call.name === 'OFFSET') {
         var base = resolveRefArg(call.args[0], contextSheetName, values, namedRanges, depth);
-        var dr = blankArgIsZero(call.args[1], contextSheetName, values);
-        var dc = blankArgIsZero(call.args[2], contextSheetName, values);
+        var dr = blankArgIsZero(call.args[1], contextSheetName, values, namedRanges);
+        var dc = blankArgIsZero(call.args[2], contextSheetName, values, namedRanges);
         if (!base) reason = 'base reference not static';
         else if (dr === null || dc === null) reason = 'row/column offset needs an unsupported function';
         else {
           var h = call.args.length > 3 && call.args[3] !== ''
-            ? evalNumericArg(call.args[3], contextSheetName, values) : (base.r2 - base.r1 + 1);
+            ? evalNumericArg(call.args[3], contextSheetName, values, namedRanges) : (base.r2 - base.r1 + 1);
           var w = call.args.length > 4 && call.args[4] !== ''
-            ? evalNumericArg(call.args[4], contextSheetName, values) : (base.c2 - base.c1 + 1);
+            ? evalNumericArg(call.args[4], contextSheetName, values, namedRanges) : (base.c2 - base.c1 + 1);
           if (h === null || w === null) reason = 'height/width needs an unsupported function';
           else {
             var r1 = base.r1 + dr, c1 = base.c1 + dc;
@@ -363,9 +387,9 @@ function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, d
         var range = resolveRefArg(call.args[0], contextSheetName, values, namedRanges, depth);
         callBase = range;
         var rn = call.args.length > 1
-          ? blankArgIsZero(call.args[1], contextSheetName, values) : 1;
+          ? blankArgIsZero(call.args[1], contextSheetName, values, namedRanges) : 1;
         var cn = call.args.length > 2 && String(call.args[2]).trim() !== ''
-          ? evalNumericArg(call.args[2], contextSheetName, values) : null;
+          ? evalNumericArg(call.args[2], contextSheetName, values, namedRanges) : null;
         if (!range) reason = 'first argument is not a static range';
         else if (rn === null) reason = 'row number needs an unsupported function';
         else if (cn === null && range.r1 === range.r2 && range.c1 !== range.c2) {
@@ -394,7 +418,7 @@ function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, d
         if (call.args.length > 1 && /FALSE/i.test(call.args[1])) {
           reason = 'R1C1 form is not supported';
         } else {
-          var text = evalTextArg(call.args[0] || '', contextSheetName, values);
+          var text = evalTextArg(call.args[0] || '', contextSheetName, values, namedRanges);
           if (text === null) reason = 'reference text needs an unsupported function';
           else {
             var bang = text.lastIndexOf('!');
