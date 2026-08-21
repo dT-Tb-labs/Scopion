@@ -877,6 +877,22 @@ function evalNumericArg(argText, contextSheetName, values, namedRanges) {
 
   if (/^-?[0-9]+(\.[0-9]+)?$/.test(text)) return Number(text);
 
+  var call = evalSupportedCall(text, contextSheetName, values, namedRanges);
+  if (call !== null) return call;
+
+  // MATCH(...)+1 and COUNT(...)-1 are everyday model idioms, so substitute any
+  // supported call with its value and let the arithmetic below finish the job.
+  // Substituted back-to-front, or an earlier replacement would shift the
+  // positions of the ones after it.
+  var inner = findCalls(text, SUPPORTED_CALLS);
+  for (var c = inner.length - 1; c >= 0; c--) {
+    if (inner[c].text === text) continue; // the bare-call case, handled above
+    var v = evalSupportedCall(inner[c].text, contextSheetName, values, namedRanges);
+    if (v === null) return null;
+    text = text.substring(0, inner[c].index) + v +
+           text.substring(inner[c].index + inner[c].text.length);
+  }
+
   var refs = extractRefs(text);
   var substituted = text;
   for (var i = 0; i < refs.length; i++) {
@@ -937,6 +953,80 @@ function singleCellValue(ref, contextSheetName, values, namedRanges) {
     return values.get(ref.sheet || contextSheetName, ref.a1);
   }
   return null;
+}
+
+/**
+ * Evaluate the small set of functions that real models put INSIDE a dynamic
+ * reference. Without these, INDEX(range, MATCH(...)) and
+ * OFFSET(base, 0, 0, COUNT(range), 1) — the two idioms most financial models
+ * are built from — could only ever be reported as unresolved.
+ *
+ * Deliberately narrow: an unsupported shape returns null and the caller says
+ * so, which is safe. Guessing would put a wrong cell under a right-looking
+ * address.
+ */
+var SUPPORTED_CALLS = ['MATCH', 'COUNT', 'COUNTA', 'ROWS', 'COLUMNS'];
+
+function evalSupportedCall(argText, contextSheetName, values, namedRanges) {
+  var text = String(argText === undefined ? '' : argText).trim();
+  var calls = findCalls(text, SUPPORTED_CALLS);
+  if (!calls.length || calls[0].text !== text) return null; // must BE the call
+  var call = calls[0];
+  var rangeOf = function (i) {
+    return resolveRefArg(call.args[i], contextSheetName, values, namedRanges);
+  };
+
+  if (call.name === 'ROWS' || call.name === 'COLUMNS') {
+    var r = rangeOf(0);
+    if (!r) return null;
+    return call.name === 'ROWS' ? (r.r2 - r.r1 + 1) : (r.c2 - r.c1 + 1);
+  }
+
+  if (call.name === 'COUNT' || call.name === 'COUNTA') {
+    var cr = rangeOf(0);
+    if (!cr) return null;
+    var cells = values.getRect(cr);
+    if (!cells.length) return null;
+    var n = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var v = cells[i];
+      if (call.name === 'COUNT') { if (typeof v === 'number') n++; }
+      else if (v !== '' && v !== null && v !== undefined) n++;
+    }
+    return n;
+  }
+
+  // MATCH(key, range, 0). Only exact match: types 1 and -1 assume the range is
+  // sorted, and a wrong assumption there silently returns the wrong row.
+  var type = call.args.length > 2 ? String(call.args[2]).trim() : '1';
+  if (type !== '0') return null;
+  var range = rangeOf(1);
+  if (!range) return null;
+  var key = evalScalar(call.args[0], contextSheetName, values, namedRanges);
+  if (key === null) return null;
+  var list = values.getRect(range);
+  if (!list.length) return null;
+  for (var j = 0; j < list.length; j++) {
+    var cell = list[j];
+    if (cell === key) return j + 1;
+    if (typeof cell === 'string' && typeof key === 'string' &&
+        cell.toUpperCase() === key.toUpperCase()) return j + 1;
+  }
+  return null; // #N/A — not a number we can offset by
+}
+
+/** A literal, or the value of one cell. Used for a MATCH key. */
+function evalScalar(argText, contextSheetName, values, namedRanges) {
+  var text = String(argText === undefined ? '' : argText).trim();
+  if (text === '') return null;
+  var str = /^"((?:[^"]|"")*)"$/.exec(text);
+  if (str) return str[1].split('""').join('"');
+  if (/^-?[0-9]+(\.[0-9]+)?$/.test(text)) return Number(text);
+  var refs = extractRefs(text);
+  if (refs.length !== 1) return null;
+  var bare = text.replace(/\$/g, '');
+  if (refs[0].raw !== text && refs[0].raw !== bare) return null;
+  return singleCellValue(refs[0], contextSheetName, values, namedRanges);
 }
 
 /** OFFSET(A1,,2) is legal: an omitted argument is zero, not an unresolvable one. */
@@ -1031,6 +1121,33 @@ function ValueCache(ss) {
   this.sheets = {};
   this.singles = {};
 }
+
+/** Values of a rectangle, from the same cached grid. [] when unavailable. */
+ValueCache.prototype.getRect = function (r) {
+  if (!r) return [];
+  var grid = this.grid(r.sheetName);
+  if (!grid || !grid.length) return [];
+  var out = [];
+  var lastRow = Math.min(r.r2, grid.length);
+  var lastCol = Math.min(r.c2, grid[0].length);
+  for (var row = r.r1; row <= lastRow; row++) {
+    for (var col = r.c1; col <= lastCol; col++) out.push(grid[row - 1][col - 1]);
+  }
+  return out;
+};
+
+/** The cached used-range grid for a sheet, or null when it cannot be held. */
+ValueCache.prototype.grid = function (sheetName) {
+  var grid = this.sheets[sheetName];
+  if (grid === undefined) {
+    var sheet = this.ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() === 0) grid = null;
+    else if (sheet.getLastRow() * sheet.getLastColumn() > MAX_GRID_CACHE_CELLS) grid = false;
+    else grid = sheet.getDataRange().getValues();
+    this.sheets[sheetName] = grid;
+  }
+  return grid === false ? null : grid;
+};
 
 ValueCache.prototype.get = function (sheetName, a1) {
   var r = a1ToRect(a1, sheetName);

@@ -210,6 +210,31 @@ res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B3', mode: 'dependent
 check('a reader through an OFFSET argument', addrs(res).sort(),
   ['Model!A2', 'Model!A3', 'Model!A6', 'Model!A8'].sort());
 
+console.log('lookup idioms');
+// The two shapes almost every financial model is built from.
+const look = sheetOf('Lookup', {
+  1: { 1: 'hdr', 2: '', 3: 'hdr' },
+  2: { 1: 'FY24', 2: 1, 3: 100 },
+  3: { 1: 'FY25', 2: 2, 3: 200 },
+  4: { 1: 'FY26', 2: 3, 3: 300 },
+  5: { 1: 'FY27', 2: 4, 3: 400 }
+});
+look.parent = ss; ss.sheets.push(look);
+model.cells[20] = { 1: { formula: '=INDEX(Lookup!C2:C5,MATCH("FY26",Lookup!A2:A5,0))', value: 300, background: '#ffffff' } };
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A20', mode: 'precedents' });
+check('INDEX/MATCH resolves the landed cell', addrs(res).indexOf('Lookup!C4') >= 0, true);
+check('and is not reported unresolvable', res.unresolved.length, 0);
+
+model.cells[21] = { 1: { formula: '=OFFSET(Lookup!A1,COUNTA(Lookup!A2:A5),0)', value: 0, background: '#ffffff' } };
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A21', mode: 'precedents' });
+check('OFFSET over COUNTA resolves', addrs(res).indexOf('Lookup!A5') >= 0, true);
+
+model.cells[22] = { 1: { formula: '=INDEX(Lookup!C2:C5,MATCH("FY26",Lookup!A2:A5,1))', value: 0, background: '#ffffff' } };
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A22', mode: 'precedents' });
+check('a sorted MATCH is reported unresolved, never guessed', res.unresolved.length, 1);
+delete model.cells[20]; delete model.cells[21]; delete model.cells[22];
+ss.sheets.pop();
+
 console.log('reading order');
 model.cells[9] = { 1: { formula: '=Inputs!B2+Inputs!B1+Inputs!B3', value: 0, background: '#ffffff' } };
 res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A9', mode: 'precedents' });
