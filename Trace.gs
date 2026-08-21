@@ -7,7 +7,6 @@
  */
 
 var MAX_MATERIALIZE_BBOX = 200000; // cells; above this, read targets one by one
-var MAX_BATCH_CELLS_PER_TARGET = 64; // a batch must stay dense, not just small
 var SCAN_DEADLINE_MS = 240000;     // stop scanning well inside the 6-minute cap
 
 var MAX_GRID_CACHE_CELLS = 200000;  // above this, read single cells instead of the whole grid
