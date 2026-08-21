@@ -138,6 +138,18 @@ function runTests() {
 
   // --- regressions found in review ---------------------------------------
   t.push(function () {
+    // Error literals are constants. Parsed as identifiers they become
+    // named-range candidates, and a workbook with a name like N or DIV would
+    // then be reported as a precedent the formula never reads.
+    assertEq(refKeys('=IFERROR(A1,#N/A)'), ['A1'], '#N/A is not the names N and A');
+    assertEq(refKeys('=IFERROR(A1/B1,#DIV/0!)'), ['A1', 'B1'], '#DIV/0! is not the name DIV');
+    assertEq(refKeys('=#NAME?'), [], '#NAME? is not the name NAME');
+    assertEq(refKeys('=IF(A1=#VALUE!,0,1)'), ['A1'], '#VALUE! is a constant');
+    assertEq(refKeys('=#REF!A1+B2'), ['B2'],
+      'the address after #REF! is meaningless and must not become a same-sheet ref');
+  });
+
+  t.push(function () {
     assertEq(refKeys('=LET(rate,A1,rate*2)'), ['A1'],
       'a LET-bound name is local, not a workbook named range');
     assertEq(refKeys('=LAMBDA(x,x+A1)(B1)'), ['A1', 'B1'],

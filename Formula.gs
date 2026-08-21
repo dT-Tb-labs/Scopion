@@ -125,6 +125,25 @@ function tokenize(formula) {
       continue;
     }
 
+    // Error literals are constants, not references. Left to the identifier
+    // scanner, "#N/A" becomes the named-range candidates N and A and
+    // "#DIV/0!" becomes DIV — and a workbook that really has a name like
+    // that would then show a precedent the formula never reads.
+    if (c === '#') {
+      var err = /^#(NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A|ERROR!)/i.exec(s.substring(i));
+      if (err) {
+        i += err[0].length;
+        // "#REF!A1" is what a formula pointing at a deleted sheet looks like:
+        // the address after it is meaningless, and reading it as a same-sheet
+        // reference would invent a precedent.
+        if (/^REF!$/i.test(err[1])) {
+          while (i < s.length && isIdentChar(s.charAt(i))) i++;
+        }
+        tokens.push({ type: TOK.NUMBER, value: err[0] });
+        continue;
+      }
+    }
+
     if (isIdentChar(c)) {
       var start = i;
       var ident = '';
