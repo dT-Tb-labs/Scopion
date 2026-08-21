@@ -2,7 +2,7 @@
   "title": "Scopion (Google Sheets)",
   "rules": [
     {
-      "description": "Double-tap Right Command -> Ctrl+Alt+Shift+1 (Scopion macro) in browsers only",
+      "description": "Double-tap Right Command -> Cmd+Option+Shift+1 (Scopion macro) in browsers only",
       "manipulators": [
         {
           "type": "basic",
@@ -14,7 +14,7 @@
             { "set_variable": { "name": "scopion_tap", "value": 0 } },
             {
               "key_code": "1",
-              "modifiers": ["left_control", "left_option", "left_shift"]
+              "modifiers": ["left_command", "left_option", "left_shift"]
             }
           ],
           "conditions": [
@@ -63,7 +63,7 @@
       ]
     },
     {
-      "description": "Cmd+Shift+A -> Ctrl+Alt+Shift+1 (Scopion macro) in browsers only",
+      "description": "Cmd+Shift+A -> Cmd+Option+Shift+1 (Scopion macro) in browsers only",
       "manipulators": [
         {
           "type": "basic",
@@ -74,7 +74,7 @@
           "to": [
             {
               "key_code": "1",
-              "modifiers": ["left_control", "left_option", "left_shift"]
+              "modifiers": ["left_command", "left_option", "left_shift"]
             }
           ],
           "conditions": [
