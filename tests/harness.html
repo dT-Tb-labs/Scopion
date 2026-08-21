@@ -345,6 +345,7 @@ window.Logger = { log: () => {} };
  * has to come out of the formula string instead, which is what this file does.
  */
 
+var ERROR_LITERALS = ['#NULL!', '#DIV/0!', '#VALUE!', '#REF!', '#NAME?', '#NUM!', '#N/A', '#ERROR!'];
 var MAX_COL = 18278; // Google Sheets column limit (ZZZ)
 var MAX_ROW = 10000000;
 
@@ -465,19 +466,25 @@ function tokenize(formula) {
 
     // Error literals are constants, not references. Left to the identifier
     // scanner, "#N/A" becomes the named-range candidates N and A and
-    // "#DIV/0!" becomes DIV — and a workbook that really has a name like
-    // that would then show a precedent the formula never reads.
+    // "#DIV/0!" becomes DIV — and a workbook that really defines such a name
+    // would then show a precedent the formula never reads. Matched by literal
+    // comparison rather than a regex: the pattern needs backslashes, and those
+    // do not survive being moved between environments intact.
     if (c === '#') {
-      var err = /^#(NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A|ERROR!)/i.exec(s.substring(i));
-      if (err) {
-        i += err[0].length;
+      var head = s.substring(i, i + 8).toUpperCase();
+      var hit = null;
+      for (var e = 0; e < ERROR_LITERALS.length; e++) {
+        if (head.indexOf(ERROR_LITERALS[e]) === 0) { hit = ERROR_LITERALS[e]; break; }
+      }
+      if (hit) {
+        i += hit.length;
         // "#REF!A1" is what a formula pointing at a deleted sheet looks like:
         // the address after it is meaningless, and reading it as a same-sheet
         // reference would invent a precedent.
-        if (/^REF!$/i.test(err[1])) {
+        if (hit === '#REF!') {
           while (i < s.length && isIdentChar(s.charAt(i))) i++;
         }
-        tokens.push({ type: TOK.NUMBER, value: err[0] });
+        tokens.push({ type: TOK.NUMBER, value: hit });
         continue;
       }
     }
