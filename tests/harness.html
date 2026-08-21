@@ -2113,6 +2113,8 @@ function setStatus(kind) {
 // ---------------------------------------------------------------------------
 function requestJump(target, noPaint) {
   S.desiredTarget = target;
+  // Per-jump, never sticky: a no-paint jump (Return to origin) used to leave
+  // this false, so every later walk and drill stopped highlighting.
   S.paintWalk = !noPaint;
   S.suppressedKey = keyOf(target);
   S.echoExpiry = Date.now() + 2500;
@@ -2162,7 +2164,9 @@ function pumpJumps() {
 // The server owns the highlight record (DocumentProperties), so the client
 // only says whether this hop should paint.
 function highlightRequest() {
-  return { apply: S.paintWalk !== false };
+  var apply = S.paintWalk !== false;
+  S.paintWalk = true; // consume the flag: it only ever describes THIS hop
+  return { apply: apply };
 }
 
 function consumeHighlight(selection) {

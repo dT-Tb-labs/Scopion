@@ -1,3 +1,4 @@
 .babel/
 .claude/
 node_modules/
+.sol/

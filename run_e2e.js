@@ -284,6 +284,13 @@ sandbox.scopionClearHighlight();
 check('an orphaned highlight is never restored as the original colour',
   hid.getRange('A3').getBackground(), '#ffffff');
 
+// a no-paint hop must not disable the highlight for the hops after it
+sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hidId, row: 1, column: 1 }, highlight: { apply: false } });
+check('a no-paint hop paints nothing', hid.getRange('A1').getBackground() !== '#ccff90', true);
+sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hidId, row: 2, column: 1 }, highlight: { apply: true } });
+check('the hop after it paints again', hid.getRange('A2').getBackground(), '#ccff90');
+sandbox.scopionClearHighlight();
+
 // the sidebar dies mid-walk: a fresh session must clean up the orphan
 sandbox.scopionObserve({ knownKey: null, mode: 'precedents', firstRun: true });
 check('a new session clears an orphaned highlight', modelSheet.getRange('B3').getBackground(), '#ffffff');
