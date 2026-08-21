@@ -237,10 +237,15 @@ class Range {
     return out;
   }
   getFormulas() { return this._grid((c) => c.formula); }
-  getValues() { return this._grid((c) => c.value); }
+  getValues() { CELLS_READ.n += this.nr * this.nc; return this._grid((c) => c.value); }
   getDisplayValues() { return this._grid((c) => (c.value === '' || c.value === null ? '' : String(c.value))); }
   getBackgrounds() { return this._grid((c) => c.background); }
 }
+
+const CELLS_READ = { n: 0 };
+// Round trips, not bytes, are what an audit spends its time on in Apps Script.
+const API_CALLS = { n: 0 };
+const counted = (fn) => function (...a) { API_CALLS.n++; return fn.apply(this, a); };
 
 class Sheet {
   constructor(name, cells, hidden) {
@@ -253,15 +258,17 @@ class Sheet {
   isSheetHidden() { return this.hidden; }
   showSheet() { this.hidden = false; } hideSheet() { this.hidden = true; }
   activate() { this.parent.active = this; }
-  getLastRow() { return Math.max(0, ...Object.keys(this.cells).map(Number)); }
-  getMaxRows() { return this.maxRows || 1000; }      // a new Google sheet is 1000 x 26
-  getMaxColumns() { return this.maxCols || 26; }
-  getLastColumn() {
+  _lastRow() { return Math.max(0, ...Object.keys(this.cells).map(Number)); }
+  getLastRow() { API_CALLS.n++; return this._lastRow(); }
+  getMaxRows() { API_CALLS.n++; return this.maxRows || 1000; }   // a new Google sheet is 1000 x 26
+  getMaxColumns() { API_CALLS.n++; return this.maxCols || 26; }
+  _lastCol() {
     let max = 0;
     for (const r of Object.keys(this.cells)) max = Math.max(max, ...Object.keys(this.cells[r]).map(Number));
     return max;
   }
-  getDataRange() { return new Range(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); }
+  getLastColumn() { API_CALLS.n++; return this._lastCol(); }
+  getDataRange() { API_CALLS.n++; return new Range(this, 1, 1, Math.max(this._lastRow(), 1), Math.max(this._lastCol(), 1)); }
   getRange(a, b, c, d) {
     if (typeof a === 'string') { const p = parseA1(a); return new Range(this, p.r1, p.c1, p.r2 - p.r1 + 1, p.c2 - p.c1 + 1); }
     return new Range(this, a, b, c || 1, d || 1);
@@ -1120,18 +1127,89 @@ function ValueCache(ss) {
   this.ss = ss;
   this.sheets = {};
   this.singles = {};
+  this.rects = {};
+  this.reads = {};
+  this.dimensions = {};
 }
 
-/** Values of a rectangle, from the same cached grid. [] when unavailable. */
-ValueCache.prototype.getRect = function (r) {
-  if (!r) return [];
-  var grid = this.grid(r.sheetName);
-  if (!grid || !grid.length) return [];
+/**
+ * getLastRow and friends are server round trips, not properties, and the round
+ * trips are what an audit actually spends its time on: measured on a
+ * 51,600-formula model, one audit made 52 calls to fetch 1,242 cells. A sheet's
+ * extent cannot change mid-audit, so it is fetched once.
+ */
+ValueCache.prototype.dims = function (sheet) {
+  var name = sheet.getName();
+  var d = this.dimensions[name];
+  if (!d) {
+    d = this.dimensions[name] = {
+      lastRow: sheet.getLastRow(),
+      lastCol: sheet.getLastColumn(),
+      maxRows: sheet.getMaxRows(),
+      maxCols: sheet.getMaxColumns()
+    };
+  }
+  return d;
+};
+
+/**
+ * A MATCH over one column does not need the other forty. The Excel original
+ * never read a block at all — it asked for the referenced range and nothing
+ * else — so the first few reads of a sheet fetch only the rectangle asked for.
+ * A dependents scan hits the same sheet over and over, and there the whole
+ * grid is cheaper than the round trips, so past this many reads it switches.
+ */
+var RECT_READS_BEFORE_GRID = 8;
+
+function sliceGrid(grid, r) {
   var out = [];
   var lastRow = Math.min(r.r2, grid.length);
-  var lastCol = Math.min(r.c2, grid[0].length);
+  var lastCol = Math.min(r.c2, grid.length ? grid[0].length : 0);
   for (var row = r.r1; row <= lastRow; row++) {
-    for (var col = r.c1; col <= lastCol; col++) out.push(grid[row - 1][col - 1]);
+    var line = [];
+    for (var col = r.c1; col <= lastCol; col++) line.push(grid[row - 1][col - 1]);
+    out.push(line);
+  }
+  return out;
+}
+
+/** Rows of values covering `r`, clamped to the used range. [] when unavailable. */
+ValueCache.prototype.read = function (r) {
+  if (!r) return [];
+  var name = r.sheetName;
+  var grid = this.sheets[name];
+  if (grid === null) return [];
+  if (grid && grid !== true) return sliceGrid(grid, r);
+
+  var key = name + '!' + r.r1 + ',' + r.c1 + ',' + r.r2 + ',' + r.c2;
+  if (key in this.rects) return this.rects[key];
+
+  var sheet = this.ss.getSheetByName(name);
+  if (!sheet) { this.sheets[name] = null; return []; }
+  var d = this.dims(sheet);
+  if (d.lastRow === 0) { this.sheets[name] = null; return []; }
+
+  this.reads[name] = (this.reads[name] || 0) + 1;
+  if (grid === undefined && this.reads[name] > RECT_READS_BEFORE_GRID &&
+      d.lastRow * d.lastCol <= MAX_GRID_CACHE_CELLS) {
+    this.sheets[name] = sheet.getDataRange().getValues();
+    return sliceGrid(this.sheets[name], r);
+  }
+
+  var lastRow = Math.min(r.r2, d.lastRow);
+  var lastCol = Math.min(r.c2, d.lastCol);
+  var out = (r.r1 > lastRow || r.c1 > lastCol) ? [] :
+    sheet.getRange(r.r1, r.c1, lastRow - r.r1 + 1, lastCol - r.c1 + 1).getValues();
+  this.rects[key] = out;
+  return out;
+};
+
+/** Values of a rectangle, flattened. [] when unavailable. */
+ValueCache.prototype.getRect = function (r) {
+  var rows = this.read(r);
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    for (var j = 0; j < rows[i].length; j++) out.push(rows[i][j]);
   }
   return out;
 };
@@ -1167,31 +1245,8 @@ ValueCache.prototype.grid = function (sheetName) {
 ValueCache.prototype.get = function (sheetName, a1) {
   var r = a1ToRect(a1, sheetName);
   if (!r) return null;
-
-  var grid = this.sheets[sheetName];
-  if (grid === undefined) {
-    var sheet = this.ss.getSheetByName(sheetName);
-    if (!sheet || sheet.getLastRow() === 0) {
-      grid = null;
-    } else if (sheet.getLastRow() * sheet.getLastColumn() > MAX_GRID_CACHE_CELLS) {
-      grid = false;
-    } else {
-      grid = sheet.getDataRange().getValues();
-    }
-    this.sheets[sheetName] = grid;
-  }
-
-  if (grid === false) {
-    var key = sheetName + '!' + a1;
-    if (!(key in this.singles)) {
-      var sh = this.ss.getSheetByName(sheetName);
-      this.singles[key] = sh ? sh.getRange(r.r1, r.c1).getValue() : null;
-    }
-    return this.singles[key];
-  }
-  if (!grid) return null;
-  if (grid.length === 0 || r.r1 > grid.length || r.c1 > grid[0].length) return null;
-  return grid[r.r1 - 1][r.c1 - 1];
+  var rows = this.read({ sheetName: sheetName, r1: r.r1, c1: r.c1, r2: r.r1, c2: r.c1 });
+  return (rows.length && rows[0].length) ? rows[0][0] : null;
 };
 
 /** Evaluate an argument to a reference string, for INDIRECT. */
@@ -1501,6 +1556,16 @@ function rectsOverlap(a, b) {
 var SETTING_KEYS = ['showExternal', 'traverseHidden', 'showNamedRanges', 'followMode'];
 var BLANK_LABEL = '---BLANK CELL---';
 var WALK_HIGHLIGHT = '#ccff90'; // the Excel original painted the walked cell ColorIndex 4
+
+// A block this size is a whole model section, not a figure a modeller checks.
+// Summing it costs a full-sheet read and prints a number nobody can read, so
+// the row states its size instead.
+var MAX_TOTAL_CELLS = 5000;
+
+// A whole-sheet dependents scan can return thousands of hits. Past this many
+// the list stops being something a person walks, so the rest is reported as a
+// count rather than shipped to the sidebar.
+var MAX_DEPENDENT_ROWS = 200;
 
 function onOpen() {
   // AuthMode.NONE-safe: menu construction only, no spreadsheet reads.
@@ -1820,6 +1885,15 @@ function scopionAuditCore(request) {
     targets = targets.filter(function (t) { return !t.external; });
   }
 
+  // Cap after filtering, so the reported remainder is what the user would
+  // actually have seen. Truncating in silence would read as "that is all of
+  // them", which is the one thing a dependents list must never imply.
+  if (mode !== 'precedents' && targets.length > MAX_DEPENDENT_ROWS) {
+    skipped.push((targets.length - MAX_DEPENDENT_ROWS) + ' more dependents (showing first ' +
+      MAX_DEPENDENT_ROWS + ')');
+    targets = targets.slice(0, MAX_DEPENDENT_ROWS);
+  }
+
   var rows = materializeRows(ss, targets, visible, values);
 
   // Navigation identity for each row (sheetId:row:col of the row's top-left).
@@ -1926,10 +2000,18 @@ function materializeRows(ss, targets, visible, cache) {
       continue;
     }
 
-    var maxRow = Math.max(sheet.getLastRow(), 1);
-    var maxCol = Math.max(sheet.getLastColumn(), 1);
+    var dim = cache ? cache.dims(sheet) :
+      { lastRow: sheet.getLastRow(), lastCol: sheet.getLastColumn(),
+        maxRows: sheet.getMaxRows(), maxCols: sheet.getMaxColumns() };
+    var maxRow = Math.max(dim.lastRow, 1);
+    var maxCol = Math.max(dim.lastCol, 1);
     var box = boundingBox(items, maxRow, maxCol);
-    var useBatch = box && (box.r2 - box.r1 + 1) * (box.c2 - box.c1 + 1) <= MAX_MATERIALIZE_BBOX;
+    // The box already spans only the cells actually read — one per target, its
+    // top-left. Three reads of that box beat three reads per target, because in
+    // Apps Script the round trip costs far more than the cells in it: measured,
+    // batching this back was worth nine round trips on a six-reference audit.
+    var boxCells = box ? (box.r2 - box.r1 + 1) * (box.c2 - box.c1 + 1) : 0;
+    var useBatch = box && boxCells <= MAX_MATERIALIZE_BBOX;
 
     var values = null, backgrounds = null, formulas = null;
     if (useBatch) {
@@ -1946,7 +2028,7 @@ function materializeRows(ss, targets, visible, cache) {
 
       // Beyond the used range there is nothing to read. Clamping to the last
       // used cell would show a different cell's value under the right address.
-      var withinGrid = rct.r1 <= sheet.getMaxRows() && rct.c1 <= sheet.getMaxColumns();
+      var withinGrid = rct.r1 <= dim.maxRows && rct.c1 <= dim.maxCols;
       if (rct.r1 > maxRow || rct.c1 > maxCol) {
         rows.push({
           index: item.index, external: false, sheetName: sheetName,
@@ -2005,12 +2087,18 @@ function materializeRows(ss, targets, visible, cache) {
  *  it is numeric. */
 function rangeTotal(cache, rct) {
   if (!cache) return '\u2014';
+  var cells = (rct.r2 - rct.r1 + 1) * (rct.c2 - rct.c1 + 1);
+  if (cells > MAX_TOTAL_CELLS) return '(' + formatNumber(cells) + ' cells)';
   var t = cache.sumRect(rct);
   if (!t.count) return '\u2014';
   return formatNumber(t.sum) + ' (' + t.count + ')';
 }
 
 function formatNumber(n) {
+  if (typeof n !== 'number' || !isFinite(n)) return String(n);
+  // Grouped digits stop being readable long before JavaScript switches to
+  // exponent notation on its own, so the cutover happens here instead.
+  if (n !== 0 && (Math.abs(n) >= 1e15 || Math.abs(n) < 1e-4)) return n.toExponential(2);
   var rounded = Math.round(n * 100) / 100;
   var parts = String(rounded).split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -2531,7 +2619,7 @@ function renderWarnings(audit) {
     html += '</ul></div>';
   }
   if (audit.skippedSheets && audit.skippedSheets.length) {
-    html += '<div class="warn amber"><b>Not scanned:</b> ' +
+    html += '<div class="warn amber"><b>Not shown:</b> ' +
       esc(audit.skippedSheets.join(', ')) + '</div>';
   }
   $('warnings').innerHTML = html;
