@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
 <base target="_top">
 <style>
   :root {
@@ -65,7 +66,8 @@
   .warn.amber { background: var(--amber-bg); color: var(--amber); border-left: 3px solid var(--amber); }
   .warn.red { background: var(--red-bg); color: var(--red); border-left: 3px solid var(--red); }
   .warn ul { margin: 4px 0 0; padding-left: 16px; }
-  .warn .mono { user-select: text; }
+  .warn li { overflow-wrap: anywhere; }
+  .warn .mono { user-select: text; word-break: break-all; }
 
   .listhead {
     display: flex; justify-content: space-between; align-items: center;
@@ -73,7 +75,10 @@
   }
   .hint { color: var(--blue); cursor: pointer; }
 
-  #list { outline: none; margin: 0 8px; }
+  #list { outline: none; margin: 0 8px; border-radius: 8px; }
+  #list:focus-visible, #list:focus {
+    outline: 2px solid var(--blue); outline-offset: 0;
+  }
   #list.blank-alert { background: #fffbe6; border-radius: 6px; }
   .row {
     position: relative; padding: 6px 8px 6px 14px; border-radius: 6px;
@@ -178,7 +183,7 @@ var S = {
   audit: null,            // last AuditResult
   rows: [],               // jumpable view of audit.rows
   activeIndex: -1,        // roving highlight
-  history: [],            // stack of origin targets {sheetId,row,column}
+  history: [],            // stack of {target:{sheetId,row,column}, label:"Sheet!A1"}
   unhidden: [],           // sheet names this session unhid
   settings: null,
 
@@ -195,6 +200,10 @@ var S = {
   lastInteractAt: Date.now(),
   failStreak: 0,
   sleeping: false,
+
+  // walk highlight: the one cell currently painted, with its original
+  // background, so every hop (and the end of the walk) can restore it
+  highlight: null,        // {target:{sheetId,row,column}, background} | null
 
   // jump queue (latest-wins, single flight, never auto-retried)
   desiredTarget: null,
@@ -279,7 +288,9 @@ function pollNow() {
         return;
       }
 
-      // Genuine user move: new origin, new history root.
+      // Genuine user move: new origin, new history root. The walk is over,
+      // so the painted cell goes back to its own colour.
+      clearHighlight();
       S.lastSeenKey = key;
       S.suppressedKey = null;
       S.lastChangeAt = Date.now();
@@ -329,8 +340,9 @@ function setStatus(kind) {
 // flight; only the newest target is ever sent; a failed jump is dropped, not
 // retried (a late retry would overwrite whatever the user did meanwhile).
 // ---------------------------------------------------------------------------
-function requestJump(target) {
+function requestJump(target, noPaint) {
   S.desiredTarget = target;
+  S.paintWalk = !noPaint;
   S.suppressedKey = keyOf(target);
   S.echoExpiry = Date.now() + 2500;
   clearTimeout(S.jumpTimer);
@@ -344,7 +356,7 @@ function pumpJumps() {
   var gen = S.generation;
   S.jumpInFlight = true;
   S.navCount++;
-  rpc('scopionNavigate', { action: 'jump', target: target })
+  rpc('scopionNavigate', { action: 'jump', target: target, highlight: highlightRequest() })
     .then(function (res) {
       S.jumpInFlight = false;
       S.navCount--;
@@ -352,14 +364,12 @@ function pumpJumps() {
       // must not touch any state (it would move the grid BACK to the older
       // target and corrupt the suppression keys).
       if (gen !== S.generation) { scheduleNextPoll(); return; }
+      consumeHighlight(res.selection, target);
       S.committedTarget = target;
       S.lastSeenKey = res.selection.key;
       S.suppressedKey = res.selection.key;
       if (res.selection.sheetWasUnhidden) noteUnhidden(res.selection.sheetName);
-      // The server-side activate() moves BROWSER focus into the grid, which
-      // would hand the next arrow key to Sheets and end the walk after one
-      // step. The walk owns the keyboard: take focus back.
-      $('list').focus();
+      refocusList();
       if (keyOf(S.desiredTarget) !== keyOf(target)) { pumpJumps(); return; }
       scheduleNextPoll();
     })
@@ -376,6 +386,44 @@ function pumpJumps() {
       }
       scheduleNextPoll();
     });
+}
+
+function highlightRequest() {
+  return { apply: S.paintWalk !== false, restore: S.highlight };
+}
+
+function consumeHighlight(selection, target) {
+  if (selection.highlight && selection.highlight.applied) {
+    S.highlight = { target: target, background: selection.highlight.background };
+  } else {
+    S.highlight = null;
+  }
+}
+
+/** End of a walk: put the painted cell back. Fire-and-forget. */
+function clearHighlight() {
+  if (!S.highlight) return;
+  var restore = S.highlight;
+  S.highlight = null;
+  rpc('scopionClearHighlight', restore).catch(function () {});
+}
+
+/**
+ * Take the keyboard back after a jump.
+ *
+ * MEASURED: a single focus() is not enough. The server-side activate() and the
+ * highlight repaint make Sheets re-render the grid and grab focus AFTER our
+ * call lands, so the next arrow key goes to the grid and the walk dies after
+ * one hop (observed live: only one scopionNavigate for three ArrowDowns).
+ * Re-asserting across the render window fixes it.
+ */
+function refocusList() {
+  var list = $('list');
+  [0, 120, 320, 650].forEach(function (delay) {
+    setTimeout(function () {
+      if (document.activeElement !== list) list.focus();
+    }, delay);
+  });
 }
 
 function noteUnhidden(name) {
@@ -400,11 +448,15 @@ function drill(target, historyOp) {
   S.suppressedKey = keyOf(target);
   S.echoExpiry = Date.now() + 2500;
   var outgoing = S.audit ? S.audit.origin.target : null;
-  rpc('scopionNavigate', { action: 'navigateAndAudit', target: target, mode: S.mode })
+  var outgoingLabel = S.audit ? S.audit.origin.sheetName + '!' + S.audit.origin.a1 : '';
+  rpc('scopionNavigate', { action: 'navigateAndAudit', target: target, mode: S.mode, highlight: highlightRequest() })
     .then(function (res) {
       S.navCount--;
       if (gen !== S.generation) { scheduleNextPoll(); return; }
-      if (historyOp === 'push' && outgoing) S.history.push(outgoing);
+      consumeHighlight(res.selection, target);
+      if (historyOp === 'push' && outgoing) {
+        S.history.push({ target: outgoing, label: outgoingLabel });
+      }
       else if (historyOp === 'pop') S.history.pop();
       else if (historyOp && historyOp.truncate !== undefined) S.history = S.history.slice(0, historyOp.truncate);
       S.lastSeenKey = res.selection.key;
@@ -424,7 +476,7 @@ function drill(target, historyOp) {
 
 function goBack() {
   var prev = S.history[S.history.length - 1];
-  if (prev) drill(prev, 'pop');
+  if (prev) drill(prev.target, 'pop');
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +507,7 @@ function acceptAudit(audit, focusList) {
 
   // Focus policy: sidebar-initiated renders keep keyboard control; a
   // follow-poll render must never steal focus from the grid.
-  if (focusList) $('list').focus();
+  if (focusList) refocusList();
   updateFocusHint();
 }
 
@@ -463,11 +515,11 @@ function renderCrumbs() {
   var el = $('crumbs');
   el.innerHTML = '';
   if (!S.history.length) return;
-  S.history.forEach(function (t, i) {
+  S.history.forEach(function (entry, i) {
     var chip = document.createElement('span');
     chip.className = 'chip';
-    chip.textContent = t.sheetId != null ? shortAddr(t) : '?';
-    chip.onclick = function () { drill(t, { truncate: i }); };
+    chip.textContent = entry.label || '?';
+    chip.onclick = function () { drill(entry.target, { truncate: i }); };
     el.appendChild(chip);
     var sep = document.createElement('span');
     sep.className = 'sep';
@@ -478,8 +530,6 @@ function renderCrumbs() {
   cur.textContent = S.audit ? S.audit.origin.sheetName + '!' + S.audit.origin.a1 : '';
   el.appendChild(cur);
 }
-
-function shortAddr(t) { return 'sheet ' + t.sheetId + ' R' + t.row + 'C' + t.column; }
 
 function renderWarnings(audit) {
   var html = '';
@@ -517,14 +567,21 @@ function renderList(audit) {
     el.id = 'row-' + i;
     el.setAttribute('role', 'option');
     var badges = '';
-    if (row.flag === 'H') badges += '<span class="badge h">H</span>';
-    if (row.flag === 'EX') badges += '<span class="badge ex">EX</span>';
+    if (row.flag === 'H') badges += '<span class="badge h" title="hidden sheet">H</span>';
+    if (row.flag === 'EX') badges += '<span class="badge ex" title="external file">EX</span>';
     if (row.isBlank) badges += '<span class="badge blank">BLANK</span>';
+    // The swatch mirrors the cell's own fill colour — a real modelling signal.
+    // An uncoloured cell gets NO swatch: an empty outlined square reads as a
+    // checkbox and begs to be clicked.
+    var colour = safeColour(row.background);
+    var swatch = (colour === 'transparent' || /^#f{6}$/i.test(colour)) ? '' :
+      '<span class="swatch" style="background:' + colour + '" title="cell colour"></span>';
+    var isRangeRow = row.address.indexOf(':') >= 0;
     el.innerHTML =
       '<div class="l1">' +
         '<span class="addr">' + esc(row.sheetName + '!' + row.address) + '</span>' + badges +
-        '<span class="val">' + esc(row.isBlank ? '' : row.value) + '</span>' +
-        '<span class="swatch" style="background:' + safeColour(row.background) + '"></span>' +
+        '<span class="val">' + esc(row.isBlank ? '' : (isRangeRow ? '—' : row.value)) + '</span>' +
+        swatch +
       '</div>' +
       '<div class="l2 mono">' + esc(row.sourceFormula || row.subFormula) +
         (row.viaName ? ' [' + esc(row.viaName) + ']' : '') + '</div>';
@@ -570,7 +627,7 @@ function setActive(i, jump) {
     $('list').setAttribute('aria-activedescendant', el.id);
   }
   var row = S.rows[i];
-  if (jump && row && row.jumpable && row.target) requestJump(row.target);
+  if (jump && row && row.jumpable && row.target) requestJump(row.target, false);
 }
 
 function activateRow(i) {
@@ -596,7 +653,9 @@ $('list').addEventListener('keydown', function (ev) {
   }
   else if (k === 'ArrowLeft' || k === 'Backspace') { goBack(); }
   else if (k === 'Escape') {
-    if (S.audit) requestJump(S.audit.origin.target);
+    // End of walk: return to the origin WITHOUT painting it — the walk
+    // highlight marks walked-to references, not the resting position.
+    if (S.audit) { clearHighlight(); requestJump(S.audit.origin.target, true); }
   }
   else if (k === 'p') { setMode('precedents'); }
   else if (k === 'd') { setMode('dependents'); }
@@ -651,7 +710,7 @@ $('btnRehide').onclick = function () {
 };
 
 $('btnHome').onclick = function () {
-  if (S.audit) requestJump(S.audit.origin.target);
+  if (S.audit) { clearHighlight(); requestJump(S.audit.origin.target, true); }
 };
 
 ['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {

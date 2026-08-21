@@ -1,0 +1,2455 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<base target="_top">
+<style>
+  :root {
+    --blue: #1a73e8; --blue-bg: #e8f0fe;
+    --border: #dadce0; --text: #202124; --muted: #5f6368;
+    --surface: #fff; --card: #f8f9fa;
+    --amber: #b06000; --amber-bg: #fef7e0;
+    --red: #c5221f; --red-bg: #fce8e6;
+    --green: #188038;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 0 34px;
+    font-family: Roboto, Arial, sans-serif; font-size: 13px;
+    color: var(--text); background: var(--surface); user-select: none;
+  }
+  .mono { font-family: 'Roboto Mono', Menlo, monospace; }
+
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  header .brand { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  header .dot.paused { background: #9aa0a6; }
+  header .dot.error { background: var(--red); }
+  .pill {
+    margin-left: auto; border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 10px; font-size: 11px; cursor: pointer; background: var(--surface);
+  }
+  .pill.on { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+
+  .crumbs {
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    padding: 6px 12px 0; font-size: 11px; color: var(--muted); min-height: 14px;
+  }
+  .crumbs .chip { cursor: pointer; color: var(--blue); }
+  .crumbs .sep { color: var(--border); }
+
+  .origin {
+    margin: 8px 12px; padding: 9px 10px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .origin .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .origin .addr { font-weight: 700; }
+  .origin .val { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .origin .formula {
+    margin-top: 5px; font-size: 11px; padding: 5px 6px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 4px;
+    max-height: 56px; overflow: auto; word-break: break-all; user-select: text;
+  }
+  .origin .names { margin-top: 4px; font-size: 11px; color: var(--green); font-weight: 600; }
+
+  .modes { display: flex; margin: 0 12px 6px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .modes button {
+    flex: 1; border: 0; background: var(--surface); padding: 5px 0; cursor: pointer;
+    font-size: 12px; color: var(--muted);
+  }
+  .modes button.on { background: var(--blue-bg); color: var(--blue); font-weight: 600; }
+
+  .warn { margin: 0 12px 6px; padding: 6px 8px; border-radius: 6px; font-size: 11px; }
+  .warn.amber { background: var(--amber-bg); color: var(--amber); border-left: 3px solid var(--amber); }
+  .warn.red { background: var(--red-bg); color: var(--red); border-left: 3px solid var(--red); }
+  .warn ul { margin: 4px 0 0; padding-left: 16px; }
+  .warn li { overflow-wrap: anywhere; }
+  .warn .mono { user-select: text; word-break: break-all; }
+
+  .listhead {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 2px 12px 4px; font-size: 11px; color: var(--muted);
+  }
+  .hint { color: var(--blue); cursor: pointer; }
+
+  #list { outline: none; margin: 0 8px; border-radius: 8px; }
+  #list:focus-visible, #list:focus {
+    outline: 2px solid var(--blue); outline-offset: 0;
+  }
+  #list.blank-alert { background: #fffbe6; border-radius: 6px; }
+  .row {
+    position: relative; padding: 6px 8px 6px 14px; border-radius: 6px;
+    cursor: pointer; margin-bottom: 2px;
+  }
+  .row:hover { background: #f1f3f4; }
+  .row.active { background: var(--blue-bg); }
+  .row.active::before {
+    content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px;
+    width: 3px; border-radius: 2px; background: var(--blue);
+  }
+  .row .l1 { display: flex; align-items: baseline; gap: 6px; }
+  .row .addr { font-weight: 600; font-size: 12px; }
+  .row .val { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text); }
+  .row .swatch { width: 10px; height: 10px; border: 1px solid #bbb; border-radius: 2px; flex: none; align-self: center; }
+  .badge {
+    font-size: 9px; font-weight: 700; padding: 0 4px; border-radius: 3px; flex: none;
+  }
+  .badge.h { background: var(--red-bg); color: var(--red); }
+  .badge.ex { background: #e1bee7; color: #6a1b9a; }
+  .badge.blank { background: var(--amber-bg); color: var(--amber); }
+  .row .l2 {
+    margin-top: 1px; font-size: 10px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row.dead { opacity: .55; cursor: default; }
+
+  .empty { padding: 18px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+
+  .chipbar { margin: 6px 12px; }
+  .chipbar button {
+    border: 1px solid var(--border); background: var(--surface); border-radius: 999px;
+    padding: 3px 10px; font-size: 11px; cursor: pointer; margin-right: 6px;
+  }
+
+  details.opts { margin: 4px 12px; font-size: 11px; color: var(--muted); }
+  details.opts label { display: block; margin: 3px 0; }
+
+  footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 5px 12px; background: var(--card); border-top: 1px solid var(--border);
+    font-size: 10px; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="statusDot"></span>
+  <span class="brand">Scopion</span>
+  <button class="pill on" id="followPill">Follow</button>
+</header>
+
+<div class="crumbs" id="crumbs"></div>
+
+<div class="origin" id="originCard" style="display:none">
+  <div class="top"><span class="addr" id="originAddr"></span><span class="val" id="originVal"></span></div>
+  <div class="formula mono" id="originFormula"></div>
+  <div class="names" id="originNames"></div>
+</div>
+
+<div class="modes">
+  <button id="modePrec" class="on">Precedents</button>
+  <button id="modeDep">Dependents</button>
+</div>
+
+<div id="warnings"></div>
+
+<div class="listhead">
+  <span id="stats"></span>
+  <span class="hint" id="focusHint" style="display:none">click list → ↑↓ walk</span>
+</div>
+
+<div id="list" role="listbox" tabindex="0" aria-label="References"></div>
+
+<div class="chipbar" id="chipbar" style="display:none">
+  <button id="btnRehide">Re-hide sheets</button>
+  <button id="btnHome">Return to origin</button>
+</div>
+
+<details class="opts">
+  <summary>Options</summary>
+  <label><input type="checkbox" id="showNamedRanges"> Show range names</label>
+  <label><input type="checkbox" id="traverseHidden"> Include hidden sheets</label>
+  <label><input type="checkbox" id="showExternal"> Show IMPORTRANGE refs</label>
+</details>
+
+<footer>
+  <span>↑↓ walk · ⏎ drill · ← back · p/d mode · esc origin</span>
+  <span id="pollLabel">following</span>
+</footer>
+
+
+<script>
+// ---- in-browser Apps Script stand-in (real server code + mock spreadsheet) --
+(function () {
+function colToA(n) { let s = ''; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; }
+function parseA1(a1) {
+  const m = /^\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/i.exec(a1.replace(/\$/g, ''));
+  if (!m) throw new Error('mock getRange: unsupported a1 "' + a1 + '"');
+  const col = (s) => s.toUpperCase().split('').reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0);
+  return { r1: +m[2], c1: col(m[1]), r2: m[4] ? +m[4] : +m[2], c2: m[3] ? col(m[3]) : col(m[1]) };
+}
+
+class Range {
+  constructor(sheet, r1, c1, nr, nc) { this.sheet = sheet; this.r1 = r1; this.c1 = c1; this.nr = nr; this.nc = nc; }
+  _cell(dr, dc) { return this.sheet._cell(this.r1 + dr, this.c1 + dc); }
+  getSheet() { return this.sheet; }
+  getRow() { return this.r1; } getColumn() { return this.c1; }
+  getLastRow() { return this.r1 + this.nr - 1; } getLastColumn() { return this.c1 + this.nc - 1; }
+  getCell(r, c) { return new Range(this.sheet, this.r1 + r - 1, this.c1 + c - 1, 1, 1); }
+  getNumRows() { return this.nr; }
+  getNumColumns() { return this.nc; }
+  getA1Notation() {
+    const a = colToA(this.c1) + this.r1, b = colToA(this.c1 + this.nc - 1) + (this.r1 + this.nr - 1);
+    return a === b ? a : a + ':' + b;
+  }
+  getFormula() { return this._cell(0, 0).formula; }
+  getValue() { return this._cell(0, 0).value; }
+  getDisplayValue() { const v = this._cell(0, 0).value; return v === '' || v === null ? '' : String(v); }
+  getBackground() { return this._cell(0, 0).background; }
+  setBackground(colour) {
+    const r = this.r1, c = this.c1, sh = this.sheet;
+    if (!sh.cells[r]) sh.cells[r] = {};
+    if (!sh.cells[r][c]) sh.cells[r][c] = { formula: '', value: '', background: '#ffffff' };
+    sh.cells[r][c].background = colour === null ? '#ffffff' : colour;
+    return this;
+  }
+  _grid(pick) {
+    const out = [];
+    for (let r = 0; r < this.nr; r++) { const row = [];
+      for (let c = 0; c < this.nc; c++) row.push(pick(this._cell(r, c)));
+      out.push(row); }
+    return out;
+  }
+  getFormulas() { return this._grid((c) => c.formula); }
+  getValues() { return this._grid((c) => c.value); }
+  getDisplayValues() { return this._grid((c) => (c.value === '' || c.value === null ? '' : String(c.value))); }
+  getBackgrounds() { return this._grid((c) => c.background); }
+}
+
+class Sheet {
+  constructor(name, cells, hidden) {
+    this.name = name; this.cells = cells; this.hidden = !!hidden;
+    this.sheetId = [...name].reduce((a, c) => a * 31 + c.charCodeAt(0) & 0xffff, 7);
+  }
+  getSheetId() { return this.sheetId; }
+  _cell(r, c) { return (this.cells[r] && this.cells[r][c]) || { formula: '', value: '', background: '#ffffff' }; }
+  getName() { return this.name; }
+  isSheetHidden() { return this.hidden; }
+  showSheet() { this.hidden = false; } hideSheet() { this.hidden = true; }
+  activate() { this.parent.active = this; }
+  getLastRow() { return Math.max(0, ...Object.keys(this.cells).map(Number)); }
+  getMaxRows() { return this.maxRows || 1000; }      // a new Google sheet is 1000 x 26
+  getMaxColumns() { return this.maxCols || 26; }
+  getLastColumn() {
+    let max = 0;
+    for (const r of Object.keys(this.cells)) max = Math.max(max, ...Object.keys(this.cells[r]).map(Number));
+    return max;
+  }
+  getDataRange() { return new Range(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); }
+  getRange(a, b, c, d) {
+    if (typeof a === 'string') { const p = parseA1(a); return new Range(this, p.r1, p.c1, p.r2 - p.r1 + 1, p.c2 - p.c1 + 1); }
+    return new Range(this, a, b, c || 1, d || 1);
+  }
+}
+
+class Spreadsheet {
+  constructor(sheets, names) {
+    this.sheets = sheets; sheets.forEach((s) => { s.parent = this; });
+    this.names = names || []; this.active = sheets[0]; this.activeRange = sheets[0].getRange('A1');
+  }
+  getId() { return 'mock'; }
+  getSheets() { return this.sheets; }
+  getSheetByName(n) { return this.sheets.find((s) => s.name === n) || null; }
+  getActiveSheet() { return this.active; }
+  getActiveRange() { return this.activeRange; }
+  setActiveRange(r) { this.activeRange = r; this.active = r.sheet; return r; }
+  getNamedRanges() { return this.names; }
+}
+
+/** cells: {"1": {"1": "=A2", ...}} — a string is a formula if it starts with "=". */
+function sheetOf(name, spec, hidden) {
+  const cells = {};
+  for (const r of Object.keys(spec)) {
+    cells[r] = {};
+    for (const c of Object.keys(spec[r])) {
+      const raw = spec[r][c];
+      const isFormula = typeof raw === 'string' && raw.charAt(0) === '=';
+      cells[r][c] = {
+        formula: isFormula ? raw : '',
+        value: isFormula ? (spec[r][c + '.value'] !== undefined ? spec[r][c + '.value'] : 0) : raw,
+        background: '#ffffff'
+      };
+    }
+  }
+  return new Sheet(name, cells, hidden);
+}
+
+
+
+const inputs = sheetOf('Inputs', {
+  1: { 1: 'Growth', 2: 0.05 },
+  2: { 1: 'Base', 2: 100 },
+  3: { 1: 'Shift', 2: 1 },
+  4: { 1: 'Empty', 2: '' }
+});
+const hidden = sheetOf('Hidden Calc', { 1: { 1: 7 }, 2: { 1: 8 }, 3: { 1: 9 } }, true);
+const model = sheetOf('Model', {
+  1: { 1: "=Inputs!B2*(1+Inputs!B1)" },
+  2: { 1: "=OFFSET('Hidden Calc'!A1,Inputs!B3,0)" },
+  3: { 1: '=INDEX(Inputs!B1:B4,4)' },
+  4: { 1: '=A1+A2' },
+  5: { 1: '=INDIRECT("Inputs!B2")' },
+  6: { 1: '=SUM(Inputs!B1:B3)' },
+  7: { 1: '=OFFSET(Inputs!B1,MATCH(1,Inputs!A:A,0),0)' }
+});
+const ss = new Spreadsheet([model, inputs, hidden], [
+  { getName: () => 'Growth', getRange: () => inputs.getRange('B1') },
+  { getName: () => 'Shift', getRange: () => inputs.getRange('B3') }
+]);
+ss.setActiveRange(model.getRange('A2'));
+window.__ss = ss; // test hook: Playwright inspects grid state through this
+
+const props = {};
+window.PropertiesService = {
+  getDocumentProperties: () => ({
+    getProperty: (k) => (k in props ? props[k] : null),
+    setProperty: (k, v) => { props[k] = v; }
+  })
+};
+window.SpreadsheetApp = { getActive: () => ss };
+window.Logger = { log: () => {} };
+
+// ---- real server code -------------------------------------------------------
+/**
+ * Formula.gs — pure formula text parsing. No SpreadsheetApp calls live here,
+ * so every function in this file is testable from Test.gs without a document.
+ *
+ * Port note: the Excel original found precedents with Range.NavigateArrow, which
+ * Apps Script has no equivalent of. Everything a precedent walk used to give us
+ * has to come out of the formula string instead, which is what this file does.
+ */
+
+var MAX_COL = 18278; // Google Sheets column limit (ZZZ)
+var MAX_ROW = 10000000;
+
+var TOK = {
+  STRING: 'STRING',
+  SHEET: 'SHEET',     // a sheet qualifier, i.e. the "Sheet1!" part
+  REF: 'REF',         // an A1 reference or range
+  FUNC: 'FUNC',       // an identifier immediately followed by "("
+  NAME: 'NAME',       // a bare identifier: named-range candidate
+  NUMBER: 'NUMBER',
+  PUNCT: 'PUNCT'      // ( ) , ; and operators
+};
+
+function isDigit(c) { return c >= '0' && c <= '9'; }
+function isAlpha(c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+function isIdentChar(c) { return isAlpha(c) || isDigit(c) || c === '_' || c === '.' || c === '$'; }
+
+function colToNum(letters) {
+  var n = 0;
+  for (var i = 0; i < letters.length; i++) {
+    n = n * 26 + (letters.toUpperCase().charCodeAt(i) - 64);
+  }
+  return n;
+}
+
+function numToCol(n) {
+  var s = '';
+  while (n > 0) {
+    var r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+/**
+ * Parse one side of a reference ("$A$1", "A", "1") into {col, row}, either of
+ * which may be null for a whole-column ("A") or whole-row ("1") reference.
+ * Returns null when the text is not a reference at all.
+ */
+function parseRefPart(text) {
+  var m = /^\$?([A-Za-z]{1,3})?\$?([0-9]{1,8})?$/.exec(text);
+  if (!m || (!m[1] && !m[2])) return null;
+  var col = m[1] ? colToNum(m[1]) : null;
+  var row = m[2] ? parseInt(m[2], 10) : null;
+  if (col !== null && (col < 1 || col > MAX_COL)) return null;
+  if (row !== null && (row < 1 || row > MAX_ROW)) return null;
+  return { col: col, row: row };
+}
+
+/** True when text is a self-contained A1 reference such as "B7" or "$B$7". */
+function isFullCellRef(text) {
+  var p = parseRefPart(text);
+  return !!(p && p.col !== null && p.row !== null);
+}
+
+/**
+ * Tokenize a formula. The leading "=" is optional.
+ *
+ * A character scanner rather than a regex, because the same characters mean
+ * different things depending on the state we are in:
+ *   =IF(A1="B2",...)        the "B2" inside the string literal is not a reference
+ *   ='O''Connor'!A1         the doubled quote is one literal quote, not a close
+ *   =LOG10(A1)              LOG10 is a valid A1 address; only the "(" says otherwise
+ *   =SUM(TaxRate)           TaxRate is a named range, not an address
+ */
+function tokenize(formula) {
+  var tokens = [];
+  if (!formula) return tokens;
+  var s = String(formula);
+  if (s.charAt(0) === '=') s = s.substring(1);
+  var i = 0;
+
+  while (i < s.length) {
+    var c = s.charAt(i);
+
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+
+    // String literal, "" is an escaped quote.
+    if (c === '"') {
+      var str = '';
+      i++;
+      while (i < s.length) {
+        if (s.charAt(i) === '"') {
+          if (s.charAt(i + 1) === '"') { str += '"'; i += 2; continue; }
+          i++;
+          break;
+        }
+        str += s.charAt(i); i++;
+      }
+      tokens.push({ type: TOK.STRING, value: str });
+      continue;
+    }
+
+    // Quoted sheet name, '' is an escaped quote. Only a qualifier when "!" follows.
+    if (c === "'") {
+      var name = '';
+      var j = i + 1;
+      while (j < s.length) {
+        if (s.charAt(j) === "'") {
+          if (s.charAt(j + 1) === "'") { name += "'"; j += 2; continue; }
+          j++;
+          break;
+        }
+        name += s.charAt(j); j++;
+      }
+      if (s.charAt(j) === '!') {
+        tokens.push({ type: TOK.SHEET, value: name, raw: s.substring(i, j) });
+        i = j + 1;
+      } else {
+        // A stray quoted run that is not a sheet qualifier. Skip it rather than
+        // letting its contents be scanned as references.
+        tokens.push({ type: TOK.STRING, value: name });
+        i = j;
+      }
+      continue;
+    }
+
+    if (isIdentChar(c)) {
+      var start = i;
+      var ident = '';
+      while (i < s.length && isIdentChar(s.charAt(i))) { ident += s.charAt(i); i++; }
+
+      // 1E+10 stops at the sign above; pull the exponent back in so it stays a
+      // number instead of becoming the named-range candidate "1E".
+      if (/^[0-9.]+[eE]$/.test(ident) && /[-+]/.test(s.charAt(i)) && isDigit(s.charAt(i + 1))) {
+        ident += s.charAt(i); i++;
+        while (i < s.length && isDigit(s.charAt(i))) { ident += s.charAt(i); i++; }
+      }
+
+      // Sheet qualifier: Sheet1!A1
+      if (s.charAt(i) === '!') {
+        tokens.push({ type: TOK.SHEET, value: ident, raw: ident });
+        i++;
+        continue;
+      }
+
+      // Function call: the "(" is what distinguishes LOG10( from cell LOG10.
+      if (s.charAt(i) === '(') {
+        tokens.push({ type: TOK.FUNC, value: ident.toUpperCase(), start: start });
+        continue; // leave "(" for the punct branch so bracket depth still counts it
+      }
+
+      // Range: A1:B2, A:A, 1:1. The right side may carry its own sheet qualifier
+      // (Sheet1!A1:Sheet1!B2), which we drop — a range cannot span two sheets.
+      if (s.charAt(i) === ':') {
+        var k = i + 1;
+        var rightIdent = '';
+        // The right side may repeat the sheet qualifier, quoted or not
+        // ('Sheet 1'!A1:'Sheet 1'!B10). A range cannot span two sheets, so the
+        // repeat is skipped rather than parsed.
+        if (s.charAt(k) === "'") {
+          var q = k + 1;
+          while (q < s.length) {
+            if (s.charAt(q) === "'") {
+              if (s.charAt(q + 1) === "'") { q += 2; continue; }
+              q++;
+              break;
+            }
+            q++;
+          }
+          if (s.charAt(q) === '!') k = q + 1;
+        }
+        while (k < s.length && isIdentChar(s.charAt(k))) { rightIdent += s.charAt(k); k++; }
+        if (s.charAt(k) === '!') {
+          k++;
+          rightIdent = '';
+          while (k < s.length && isIdentChar(s.charAt(k))) { rightIdent += s.charAt(k); k++; }
+        }
+        if (parseRefPart(ident) && parseRefPart(rightIdent)) {
+          tokens.push({ type: TOK.REF, value: ident + ':' + rightIdent, start: start });
+          i = k;
+          continue;
+        }
+        // Not a range after all (e.g. a named range before a ":" typo). Fall through.
+      }
+
+      if (/^[0-9.]+$/.test(ident) || /^[0-9.]+[eE][+-]?[0-9]+$/.test(ident)) {
+        tokens.push({ type: TOK.NUMBER, value: ident });
+      } else if (isFullCellRef(ident)) {
+        tokens.push({ type: TOK.REF, value: ident, start: start });
+      } else if (/^(TRUE|FALSE)$/i.test(ident)) {
+        tokens.push({ type: TOK.NUMBER, value: ident });
+      } else {
+        tokens.push({ type: TOK.NAME, value: ident, start: start });
+      }
+      continue;
+    }
+
+    tokens.push({ type: TOK.PUNCT, value: c });
+    i++;
+  }
+
+  return tokens;
+}
+
+/**
+ * Extract every reference a formula reads, as {sheet, a1, kind, raw}.
+ * `sheet` is null when the reference is unqualified (same sheet as the formula).
+ * `kind` is 'ref' | 'name' | 'external'.
+ *
+ * Dynamic targets (OFFSET/INDEX/INDIRECT) are NOT resolved here — Trace.gs does
+ * that, because resolving them needs to read cell values.
+ */
+function extractRefs(formula) {
+  var tokens = tokenize(formula);
+  var locals = boundNames(formula);
+  var out = [];
+  var pendingSheet = null;
+  var pendingSheetRaw = '';
+
+  for (var i = 0; i < tokens.length; i++) {
+    var t = tokens[i];
+
+    if (t.type === TOK.SHEET) {
+      pendingSheet = t.value;
+      pendingSheetRaw = t.raw;
+      continue;
+    }
+
+    if (t.type === TOK.FUNC && t.value === 'IMPORTRANGE') {
+      // IMPORTRANGE("<url or key>", "<Sheet!Range>") is the only cross-file read
+      // Google Sheets has. It cannot be navigated into, so it is recorded as an
+      // external row carrying its own arguments.
+      // Only a quoted literal may be shown as the source. A computed argument
+      // (=IMPORTRANGE(A1,B1)) must not be presented as a URL called "A1"; its
+      // cells are still reported as ordinary precedents by the loop below.
+      var call = splitCallArgs(formula, t.start);
+      out.push({
+        sheet: null,
+        a1: stringLiteral(call.args[1]),
+        kind: 'external',
+        raw: call.args.length ? 'IMPORTRANGE(' + call.args.join(', ') + ')' : 'IMPORTRANGE()',
+        url: stringLiteral(call.args[0])
+      });
+      pendingSheet = null;
+      continue;
+    }
+
+    if (t.type === TOK.REF) {
+      out.push({
+        sheet: pendingSheet,
+        a1: t.value.replace(/\$/g, ''),
+        kind: 'ref',
+        raw: (pendingSheet !== null ? pendingSheetRaw + '!' : '') + t.value
+      });
+      pendingSheet = null;
+      continue;
+    }
+
+    if (t.type === TOK.NAME) {
+      // A sheet-qualified bare identifier is not a named range; drop the qualifier.
+      if (pendingSheet === null && !locals[t.value.toUpperCase()]) {
+        out.push({ sheet: null, a1: t.value, kind: 'name', raw: t.value });
+      }
+      pendingSheet = null;
+      continue;
+    }
+
+    if (t.type !== TOK.PUNCT || (t.value !== '(' && t.value !== ')')) pendingSheet = null;
+  }
+
+  return dedupeRefs(out);
+}
+
+/**
+ * Names bound by LET/LAMBDA inside this formula. They look exactly like named
+ * ranges, so without this a workbook name colliding with a LET variable is
+ * reported as a precedent that the formula never reads.
+ *
+ * Scope is deliberately ignored: a name bound anywhere in the formula is treated
+ * as local throughout it. Erring towards "local" only ever drops a name that a
+ * shadowed outer scope would have resolved, which is the quieter mistake.
+ */
+function boundNames(formula) {
+  var bound = {};
+  var calls = findCalls(formula, ['LET', 'LAMBDA']);
+  for (var i = 0; i < calls.length; i++) {
+    var args = calls[i].args;
+    var limit = args.length - 1; // the last argument is the body
+    for (var a = 0; a < limit; a++) {
+      if (calls[i].name === 'LET' && a % 2 !== 0) continue; // LET alternates name, value
+      var name = String(args[a]).trim();
+      if (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name)) bound[name.toUpperCase()] = true;
+    }
+  }
+  return bound;
+}
+
+/** The text of a quoted string literal, or '' when the argument is computed. */
+function stringLiteral(arg) {
+  var text = String(arg === undefined ? '' : arg).trim();
+  var m = /^"((?:[^"]|"")*)"$/.exec(text);
+  return m ? m[1].split('""').join('"') : '';
+}
+
+function dedupeRefs(refs) {
+  var seen = {};
+  var out = [];
+  for (var i = 0; i < refs.length; i++) {
+    var key = refs[i].kind + '|' + (refs[i].sheet || '') + '|' + refs[i].a1.toUpperCase();
+    if (seen[key]) continue;
+    seen[key] = true;
+    out.push(refs[i]);
+  }
+  return out;
+}
+
+/**
+ * Split the argument list of the call whose FUNC token sits at `funcIndex`,
+ * returning the raw source text of each top-level argument. Bracket- and
+ * string-aware, so nested calls and commas inside literals stay intact.
+ */
+function splitCallArgs(formula, funcIndex) {
+  var s = String(formula);
+  if (s.charAt(0) === '=') s = s.substring(1);
+  var open = s.indexOf('(', funcIndex);
+  if (open < 0) return { args: [], end: -1 };
+
+  var args = [];
+  var cur = '';
+  var depth = 1;
+  var i = open + 1;
+  var inStr = false;
+  var inQuote = false;
+
+  while (i < s.length) {
+    var c = s.charAt(i);
+    if (inStr) {
+      cur += c;
+      if (c === '"') {
+        if (s.charAt(i + 1) === '"') { cur += '"'; i += 2; continue; }
+        inStr = false;
+      }
+      i++;
+      continue;
+    }
+    if (inQuote) {
+      cur += c;
+      if (c === "'") {
+        if (s.charAt(i + 1) === "'") { cur += "'"; i += 2; continue; }
+        inQuote = false;
+      }
+      i++;
+      continue;
+    }
+    if (c === '"') { inStr = true; cur += c; i++; continue; }
+    if (c === "'") { inQuote = true; cur += c; i++; continue; }
+    if (c === '(') { depth++; cur += c; i++; continue; }
+    if (c === ')') {
+      depth--;
+      if (depth === 0) { args.push(cur.trim()); i++; break; }
+      cur += c; i++; continue;
+    }
+    if ((c === ',' || c === ';') && depth === 1) { args.push(cur.trim()); cur = ''; i++; continue; }
+    cur += c;
+    i++;
+  }
+
+  if (depth > 0) args.push(cur.trim()); // unbalanced formula: keep what we have
+  return { args: args, end: i };
+}
+
+/**
+ * Find every call to one of `names` in a formula, returning
+ * {name, args, text, index} for each. Used for OFFSET/INDEX/INDIRECT.
+ */
+function findCalls(formula, names) {
+  var upper = {};
+  for (var n = 0; n < names.length; n++) upper[names[n].toUpperCase()] = true;
+
+  var tokens = tokenize(formula);
+  var found = [];
+  for (var i = 0; i < tokens.length; i++) {
+    var t = tokens[i];
+    if (t.type !== TOK.FUNC || !upper[t.value]) continue;
+    var split = splitCallArgs(formula, t.start);
+    if (split.end < 0) continue;
+    var body = String(formula);
+    if (body.charAt(0) === '=') body = body.substring(1);
+    found.push({
+      name: t.value,
+      args: split.args,
+      text: body.substring(t.start, split.end),
+      index: t.start
+    });
+  }
+  return found;
+}
+
+/**
+ * Trace.gs — turns a cell into a list of what it reads (precedents) or what
+ * reads it (dependents), plus the values/colours needed to render those rows.
+ *
+ * Everything here is read-only against the user's document. The only write the
+ * add-on ever performs is unhiding a sheet the user explicitly asked to jump to.
+ */
+
+var MAX_MATERIALIZE_BBOX = 200000; // cells; above this, read targets one by one
+var SCAN_DEADLINE_MS = 240000;     // stop scanning well inside the 6-minute cap
+
+var MAX_GRID_CACHE_CELLS = 200000;  // above this, read single cells instead of the whole grid
+var MAX_SCAN_CELLS = 2000000; // refuse to pull a grid large enough to exhaust the invocation
+
+function sheetTooLarge(sheet) {
+  return sheet.getLastRow() * sheet.getLastColumn() > MAX_SCAN_CELLS;
+}
+
+/** {sheetName, r1, c1, r2, c2} — r2/c2 are inclusive. */
+function rect(sheetName, r1, c1, r2, c2) {
+  return { sheetName: sheetName, r1: r1, c1: c1, r2: r2, c2: c2 };
+}
+
+function rectContains(r, sheetName, row, col) {
+  return r.sheetName === sheetName && row >= r.r1 && row <= r.r2 && col >= r.c1 && col <= r.c2;
+}
+
+function rectToA1(r) {
+  var full = r.r1 === 1 && r.r2 >= MAX_ROW;
+  var wide = r.c1 === 1 && r.c2 >= MAX_COL;
+  if (full && !wide) {
+    return numToCol(r.c1) + ':' + numToCol(r.c2);
+  }
+  if (wide && !full) {
+    return r.r1 + ':' + r.r2;
+  }
+  var a = numToCol(r.c1) + r.r1;
+  var b = numToCol(r.c2) + r.r2;
+  return a === b ? a : a + ':' + b;
+}
+
+/** Parse "A1", "A1:B2", "A:A", "1:1" into a rectangle on `sheetName`. */
+function a1ToRect(a1, sheetName) {
+  if (!a1) return null;
+  var parts = String(a1).replace(/\$/g, '').split(':');
+  var left = parseRefPart(parts[0]);
+  if (!left) return null;
+  var right = parts.length > 1 ? parseRefPart(parts[1]) : left;
+  if (!right) return null;
+
+  var r1 = left.row === null ? 1 : left.row;
+  var r2 = right.row === null ? MAX_ROW : right.row;
+  var c1 = left.col === null ? 1 : left.col;
+  var c2 = right.col === null ? MAX_COL : right.col;
+
+  return rect(sheetName, Math.min(r1, r2), Math.min(c1, c2), Math.max(r1, r2), Math.max(c1, c2));
+}
+
+/** name (upper-case) -> rectangle, built once per invocation. */
+function buildNamedRangeMap(ss) {
+  var map = {};
+  var names = ss.getNamedRanges();
+  for (var i = 0; i < names.length; i++) {
+    var nr = names[i];
+    var r;
+    try {
+      r = nr.getRange();
+    } catch (e) {
+      continue; // a name pointing at a deleted range
+    }
+    map[nr.getName().toUpperCase()] = {
+      name: nr.getName(),
+      rect: rect(r.getSheet().getName(), r.getRow(), r.getColumn(),
+                 r.getLastRow(), r.getLastColumn())
+    };
+  }
+  return map;
+}
+
+/**
+ * Turn one extracted reference into a rectangle. Returns null for anything that
+ * is not a local range (external refs and unknown names are handled by callers).
+ */
+function refToRect(ref, contextSheetName, namedRanges) {
+  if (ref.kind === 'name') {
+    var hit = namedRanges[ref.a1.toUpperCase()];
+    return hit ? hit.rect : null;
+  }
+  if (ref.kind !== 'ref') return null;
+  return a1ToRect(ref.a1, ref.sheet || contextSheetName);
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic targets: OFFSET / INDEX / INDIRECT
+//
+// SUM is deliberately NOT in this list. The Excel original scanned for it, but
+// SUM does not produce a reference — its arguments are already ordinary
+// precedents, so scanning for it double-counted every SUM range.
+// ---------------------------------------------------------------------------
+
+var DYNAMIC_FUNCS = ['OFFSET', 'INDEX', 'INDIRECT'];
+
+/**
+ * Evaluate an argument to a number, using only literals, simple arithmetic and
+ * the *values* of single-cell references. Returns null when the argument needs
+ * more than that (MATCH, QUERY, custom functions...), which the caller reports
+ * as an explicitly unresolved row rather than guessing.
+ */
+function evalNumericArg(argText, contextSheetName, values, namedRanges) {
+  var text = String(argText).trim();
+  if (text === '') return null;
+
+  if (/^-?[0-9]+(\.[0-9]+)?$/.test(text)) return Number(text);
+
+  var refs = extractRefs(text);
+  var substituted = text;
+  for (var i = 0; i < refs.length; i++) {
+    var r = refs[i];
+    var v = singleCellValue(r, contextSheetName, values, namedRanges);
+    if (typeof v !== 'number') return null;
+    // Bounded replace: a plain split on "A1" would also corrupt "A10".
+    substituted = replaceRefToken(substituted, r.raw, String(v));
+  }
+
+  // Only a bare arithmetic expression survives; anything else is unresolvable.
+  if (!/^[-+*/() 0-9.]+$/.test(substituted)) return null;
+  var value = arithmetic(substituted);
+  return (value === null || isNaN(value)) ? null : value;
+}
+
+/**
+ * Resolve an argument that must denote a range.
+ *
+ * Only an argument that IS a reference, or IS a nested dynamic call, is
+ * accepted. Picking the first reference out of an arbitrary expression makes
+ * OFFSET(OFFSET(A1,1,0),1,0) silently report A2 instead of A3, and a
+ * confidently wrong precedent is worse than a reported gap.
+ */
+function resolveRefArg(argText, contextSheetName, values, namedRanges, depth) {
+  var text = String(argText === undefined ? '' : argText).trim();
+  if (text === '') return null;
+  if ((depth || 0) > 8) return null;
+
+  var nested = findCalls(text, DYNAMIC_FUNCS);
+  if (nested.length && nested[0].text === text) {
+    var inner = resolveDynamicTargets(text, contextSheetName, values, namedRanges, (depth || 0) + 1);
+    return inner.length ? inner[0].rect : null;
+  }
+
+  var refs = extractRefs(text);
+  if (refs.length !== 1) return null;
+  var bare = text.replace(/\$/g, '');
+  if (refs[0].raw !== text && refs[0].raw !== bare) return null;
+  return refToRect(refs[0], contextSheetName, namedRanges);
+}
+
+/**
+ * The value of a reference that denotes exactly one cell, whether it is written
+ * as an address or as a named range. Named ranges are the normal way a real
+ * model writes an OFFSET argument (OFFSET(Base, Shift, 0)), so refusing them
+ * here reported every such formula as unresolvable.
+ */
+function singleCellValue(ref, contextSheetName, values, namedRanges) {
+  if (ref.kind === 'name') {
+    var nr = (namedRanges || {})[ref.a1.toUpperCase()];
+    if (!nr) return null;
+    var r = nr.rect;
+    if (r.r1 !== r.r2 || r.c1 !== r.c2) return null; // a multi-cell name is not a scalar
+    return values.get(r.sheetName, numToCol(r.c1) + r.r1);
+  }
+  if (ref.kind === 'ref' && isFullCellRef(ref.a1)) {
+    return values.get(ref.sheet || contextSheetName, ref.a1);
+  }
+  return null;
+}
+
+/** OFFSET(A1,,2) is legal: an omitted argument is zero, not an unresolvable one. */
+function blankArgIsZero(argText, contextSheetName, values, namedRanges) {
+  if (argText === undefined || String(argText).trim() === '') return 0;
+  return evalNumericArg(argText, contextSheetName, values, namedRanges);
+}
+
+/**
+ * Evaluate "1+2*(3-1)" without eval(). Recursive descent, because a
+ * shunting-yard pass has to special-case unary signs and gets "2*-3" wrong.
+ *   expr   := term (("+"|"-") term)*
+ *   term   := factor (("*"|"/") factor)*
+ *   factor := ("+"|"-") factor | number | "(" expr ")"
+ */
+function arithmetic(expr) {
+  var tokens = String(expr).match(/[0-9]*\.?[0-9]+|[-+*\/()]/g);
+  if (!tokens) return null;
+  var pos = 0;
+  var failed = false;
+
+  function peek() { return pos < tokens.length ? tokens[pos] : null; }
+
+  function factor() {
+    var t = peek();
+    if (t === '+' || t === '-') {
+      pos++;
+      var operand = factor();
+      if (failed) return 0;
+      return t === '-' ? -operand : operand;
+    }
+    if (t === '(') {
+      pos++;
+      var inner = expression();
+      if (peek() !== ')') { failed = true; return 0; }
+      pos++;
+      return inner;
+    }
+    if (t !== null && /^[0-9.]/.test(t)) { pos++; return Number(t); }
+    failed = true;
+    return 0;
+  }
+
+  function term() {
+    var value = factor();
+    while (!failed && (peek() === '*' || peek() === '/')) {
+      var op = tokens[pos++];
+      var rhs = factor();
+      if (failed) return 0;
+      if (op === '/') {
+        if (rhs === 0) { failed = true; return 0; }
+        value = value / rhs;
+      } else {
+        value = value * rhs;
+      }
+    }
+    return value;
+  }
+
+  function expression() {
+    var value = term();
+    while (!failed && (peek() === '+' || peek() === '-')) {
+      var op = tokens[pos++];
+      var rhs = term();
+      if (failed) return 0;
+      value = op === '+' ? value + rhs : value - rhs;
+    }
+    return value;
+  }
+
+  var result = expression();
+  if (failed || pos !== tokens.length || isNaN(result)) return null;
+  return result;
+}
+
+/** Replace a reference token only where it stands alone, so A1 does not match A10. */
+function replaceRefToken(text, token, value) {
+  var escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  var re = new RegExp('(^|[^A-Za-z0-9_$!.])' + escaped + '(?![A-Za-z0-9_$])', 'g');
+  return text.replace(re, function (m, lead) { return lead + value; });
+}
+
+/**
+ * One getValues() per sheet, reused for every dynamic-argument lookup.
+ * Without this, resolving OFFSET arguments during a whole-spreadsheet dependents
+ * scan would issue one API round trip per formula, which alone exhausts the
+ * execution limit on any real model. Sheets too large to hold fall back to
+ * memoised single-cell reads.
+ */
+function ValueCache(ss) {
+  this.ss = ss;
+  this.sheets = {};
+  this.singles = {};
+}
+
+ValueCache.prototype.get = function (sheetName, a1) {
+  var r = a1ToRect(a1, sheetName);
+  if (!r) return null;
+
+  var grid = this.sheets[sheetName];
+  if (grid === undefined) {
+    var sheet = this.ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() === 0) {
+      grid = null;
+    } else if (sheet.getLastRow() * sheet.getLastColumn() > MAX_GRID_CACHE_CELLS) {
+      grid = false;
+    } else {
+      grid = sheet.getDataRange().getValues();
+    }
+    this.sheets[sheetName] = grid;
+  }
+
+  if (grid === false) {
+    var key = sheetName + '!' + a1;
+    if (!(key in this.singles)) {
+      var sh = this.ss.getSheetByName(sheetName);
+      this.singles[key] = sh ? sh.getRange(r.r1, r.c1).getValue() : null;
+    }
+    return this.singles[key];
+  }
+  if (!grid) return null;
+  if (grid.length === 0 || r.r1 > grid.length || r.c1 > grid[0].length) return null;
+  return grid[r.r1 - 1][r.c1 - 1];
+};
+
+/** Evaluate an argument to a reference string, for INDIRECT. */
+function evalTextArg(argText, contextSheetName, values, namedRanges) {
+  var text = String(argText).trim();
+  var pieces = splitTopLevel(text, '&');
+  var result = '';
+
+  for (var i = 0; i < pieces.length; i++) {
+    var p = pieces[i].trim();
+    var strMatch = /^"((?:[^"]|"")*)"$/.exec(p);
+    if (strMatch) { result += strMatch[1].split('""').join('"'); continue; }
+    if (isFullCellRef(p.replace(/\$/g, ''))) {
+      var v = values.get(contextSheetName, p.replace(/\$/g, ''));
+      if (v === null) return null;
+      result += String(v);
+      continue;
+    }
+    var qualified = /^(?:'((?:[^']|'')*)'|([A-Za-z0-9_. ]+))!(\$?[A-Za-z]{1,3}\$?[0-9]+)$/.exec(p);
+    if (qualified) {
+      var sName = qualified[1] !== undefined ? qualified[1].split("''").join("'") : qualified[2];
+      var qv = values.get(sName, qualified[3].replace(/\$/g, ''));
+      if (qv === null) return null;
+      result += String(qv);
+      continue;
+    }
+    var named = (namedRanges || {})[p.toUpperCase()];
+    if (named) {
+      var nv = singleCellValue({ kind: 'name', a1: p }, contextSheetName, values, namedRanges);
+      if (nv !== null) { result += String(nv); continue; }
+    }
+    return null; // needs a function we do not implement
+  }
+  return result;
+}
+
+/** Split on a single-character operator, ignoring anything inside quotes or brackets. */
+function splitTopLevel(text, sep) {
+  var out = [], cur = '', depth = 0, inStr = false, inQuote = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (inStr) { cur += c; if (c === '"') { if (text.charAt(i + 1) === '"') { cur += '"'; i++; } else inStr = false; } continue; }
+    if (inQuote) { cur += c; if (c === "'") { if (text.charAt(i + 1) === "'") { cur += "'"; i++; } else inQuote = false; } continue; }
+    if (c === '"') { inStr = true; cur += c; continue; }
+    if (c === "'") { inQuote = true; cur += c; continue; }
+    if (c === '(') depth++;
+    if (c === ')') depth--;
+    if (c === sep && depth === 0) { out.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+/**
+ * Resolve every OFFSET/INDEX/INDIRECT call in `formula` to a rectangle.
+ * Unresolvable calls come back with `rect: null` and a reason, so the UI can
+ * show them as known-but-unresolved instead of silently omitting them.
+ */
+function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, depth) {
+  var calls = findCalls(formula, DYNAMIC_FUNCS);
+  var out = [];
+
+  for (var i = 0; i < calls.length; i++) {
+    var call = calls[i];
+    var resolved = null;
+    var reason = '';
+    var callBase = null;
+
+    try {
+      if (call.name === 'OFFSET') {
+        var base = resolveRefArg(call.args[0], contextSheetName, values, namedRanges, depth);
+        var dr = blankArgIsZero(call.args[1], contextSheetName, values, namedRanges);
+        var dc = blankArgIsZero(call.args[2], contextSheetName, values, namedRanges);
+        if (!base) reason = 'base reference not static';
+        else if (dr === null || dc === null) reason = 'row/column offset needs an unsupported function';
+        else {
+          var h = call.args.length > 3 && call.args[3] !== ''
+            ? evalNumericArg(call.args[3], contextSheetName, values, namedRanges) : (base.r2 - base.r1 + 1);
+          var w = call.args.length > 4 && call.args[4] !== ''
+            ? evalNumericArg(call.args[4], contextSheetName, values, namedRanges) : (base.c2 - base.c1 + 1);
+          if (h === null || w === null) reason = 'height/width needs an unsupported function';
+          else {
+            var r1 = base.r1 + dr, c1 = base.c1 + dc;
+            if (r1 < 1 || c1 < 1) reason = 'offset lands outside the sheet';
+            else resolved = rect(base.sheetName, r1, c1, r1 + h - 1, c1 + w - 1);
+          }
+        }
+      } else if (call.name === 'INDEX') {
+        var range = resolveRefArg(call.args[0], contextSheetName, values, namedRanges, depth);
+        callBase = range;
+        var rn = call.args.length > 1
+          ? blankArgIsZero(call.args[1], contextSheetName, values, namedRanges) : 1;
+        var cn = call.args.length > 2 && String(call.args[2]).trim() !== ''
+          ? evalNumericArg(call.args[2], contextSheetName, values, namedRanges) : null;
+        if (!range) reason = 'first argument is not a static range';
+        else if (rn === null) reason = 'row number needs an unsupported function';
+        else if (cn === null && range.r1 === range.r2 && range.c1 !== range.c2) {
+          // INDEX(A1:E1, 3) indexes along the only row, so it selects a column.
+          var oneRowCol = range.c1 + (rn > 0 ? rn - 1 : 0);
+          resolved = rn === 0
+            ? rect(range.sheetName, range.r1, range.c1, range.r1, range.c2)
+            : rect(range.sheetName, range.r1, oneRowCol, range.r1, oneRowCol);
+        } else {
+          // row 0 (or column 0) means "the whole column (or row) of the range".
+          var tr1 = rn === 0 ? range.r1 : range.r1 + rn - 1;
+          var tr2 = rn === 0 ? range.r2 : tr1;
+          // An omitted or zero column means the whole row of the range; on a
+          // single-column range that collapses back to the one cell.
+          var tc1, tc2;
+          if (cn === null || cn === 0) {
+            tc1 = range.c1;
+            tc2 = range.c2;
+          } else {
+            tc1 = range.c1 + cn - 1;
+            tc2 = tc1;
+          }
+          resolved = rect(range.sheetName, tr1, tc1, tr2, tc2);
+        }
+      } else if (call.name === 'INDIRECT') {
+        if (call.args.length > 1 && /FALSE/i.test(call.args[1])) {
+          reason = 'R1C1 form is not supported';
+        } else {
+          var text = evalTextArg(call.args[0] || '', contextSheetName, values, namedRanges);
+          if (text === null) reason = 'reference text needs an unsupported function';
+          else {
+            var bang = text.lastIndexOf('!');
+            var sheetName = contextSheetName, addr = text;
+            if (bang >= 0) {
+              sheetName = text.substring(0, bang).replace(/^'|'$/g, '').split("''").join("'");
+              addr = text.substring(bang + 1);
+            }
+            var named = namedRanges[text.toUpperCase()];
+            resolved = named ? named.rect : a1ToRect(addr, sheetName);
+            if (!resolved) reason = 'result "' + text + '" is not a valid reference';
+          }
+        }
+      }
+    } catch (e) {
+      reason = 'resolution failed: ' + e.message;
+    }
+
+    // Sheets returns #REF! when an index runs past its range; reporting the
+    // cell just outside would be a fabricated precedent.
+    if (resolved && !reason && callBase && !rectWithin(resolved, callBase)) {
+      resolved = null;
+      reason = 'index falls outside the range (Sheets returns #REF!)';
+    }
+    out.push({ rect: resolved, raw: call.text, reason: reason, dynamic: true });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Precedents / dependents
+// ---------------------------------------------------------------------------
+
+function findPrecedents(ss, sheetName, a1, namedRanges) {
+  var values = new ValueCache(ss);
+  var sheet = ss.getSheetByName(sheetName);
+  var formula = sheet.getRange(a1).getFormula();
+  var targets = [];
+  var unresolved = [];
+
+  if (formula) {
+    var refs = extractRefs(formula);
+    for (var i = 0; i < refs.length; i++) {
+      var ref = refs[i];
+      if (ref.kind === 'external') {
+        targets.push({ external: true, url: ref.url, a1: ref.a1, raw: ref.raw });
+        continue;
+      }
+      if (ref.kind === 'name' && !namedRanges[ref.a1.toUpperCase()]) continue; // a function we do not know, not a name
+      var r = refToRect(ref, sheetName, namedRanges);
+      if (r) targets.push({ rect: r, raw: ref.raw, viaName: ref.kind === 'name' ? ref.a1 : '' });
+    }
+
+    var dyn = resolveDynamicTargets(formula, sheetName, values, namedRanges);
+    for (var d = 0; d < dyn.length; d++) {
+      if (dyn[d].rect) targets.push({ rect: dyn[d].rect, raw: dyn[d].raw, dynamic: true });
+      else unresolved.push({ raw: dyn[d].raw, reason: dyn[d].reason });
+    }
+  }
+
+  return { formula: formula, targets: targets, unresolved: unresolved };
+}
+
+/**
+ * Scan every sheet's formulas and return the cells whose references cover the
+ * target. No pre-built index: one getFormulas() call per sheet, parsed in
+ * memory. The elapsed time is reported to the UI so the cost is visible rather
+ * than assumed — add an index only if these numbers justify one.
+ */
+function findDependents(ss, targetSheetName, a1, namedRanges) {
+  var values = new ValueCache(ss);
+  var target = a1ToRect(a1, targetSheetName);
+  var sheets = ss.getSheets();
+  var targets = [];
+  var skipped = [];
+  var started = Date.now();
+  var scannedFormulas = 0;
+
+  for (var s = 0; s < sheets.length; s++) {
+    var sheet = sheets[s];
+    var sheetName = sheet.getName();
+
+    if (Date.now() - started > SCAN_DEADLINE_MS) {
+      skipped.push(sheetName + ' (time limit)');
+      continue;
+    }
+    if (sheet.getLastRow() === 0) continue;
+    if (sheetTooLarge(sheet)) {
+      skipped.push(sheetName + ' (' + (sheet.getLastRow() * sheet.getLastColumn()) + ' cells)');
+      continue;
+    }
+
+    var formulas = sheet.getDataRange().getFormulas();
+    for (var r = 0; r < formulas.length; r++) {
+      if ((r & 255) === 0 && Date.now() - started > SCAN_DEADLINE_MS) {
+        skipped.push(sheetName + ' (time limit, stopped at row ' + (r + 1) + ')');
+        break;
+      }
+      var row = formulas[r];
+      for (var c = 0; c < row.length; c++) {
+        var f = row[c];
+        if (!f) continue;
+        scannedFormulas++;
+
+        var refs = extractRefs(f);
+        var hit = null;
+        for (var i = 0; i < refs.length && !hit; i++) {
+          if (refs[i].kind === 'external') continue;
+          if (refs[i].kind === 'name' && !namedRanges[refs[i].a1.toUpperCase()]) continue;
+          var rr = refToRect(refs[i], sheetName, namedRanges);
+          if (rr && rectsOverlap(rr, target)) hit = refs[i].raw;
+        }
+
+        // A dependency can also be created dynamically; resolve those only for
+        // formulas that mention one of the dynamic functions, to keep the scan cheap.
+        if (!hit && /OFFSET\s*\(|INDEX\s*\(|INDIRECT\s*\(/i.test(f)) {
+          var dyn = resolveDynamicTargets(f, sheetName, values, namedRanges);
+          for (var d = 0; d < dyn.length && !hit; d++) {
+            if (dyn[d].rect && rectsOverlap(dyn[d].rect, target)) hit = dyn[d].raw;
+          }
+        }
+
+        if (hit) {
+          targets.push({
+            rect: rect(sheetName, r + 1, c + 1, r + 1, c + 1),
+            raw: hit,
+            sourceFormula: f
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    targets: targets,
+    skipped: skipped,
+    elapsedMs: Date.now() - started,
+    scannedFormulas: scannedFormulas
+  };
+}
+
+/** True when `inner` sits entirely inside `outer`. */
+function rectWithin(inner, outer) {
+  return inner.sheetName === outer.sheetName &&
+    inner.r1 >= outer.r1 && inner.r2 <= outer.r2 &&
+    inner.c1 >= outer.c1 && inner.c2 <= outer.c2;
+}
+
+function rectsOverlap(a, b) {
+  return a.sheetName === b.sheetName &&
+    a.r1 <= b.r2 && b.r1 <= a.r2 &&
+    a.c1 <= b.c2 && b.c1 <= a.c2;
+}
+
+/**
+ * @OnlyCurrentDoc
+ *
+ * Code.gs — entry points and the RPC surface the Scopion sidebar calls.
+ *
+ * Scopion: a formula auditor for Google Sheets, descended from the Excel VBA
+ * add-in "ACE" (PwC, 2002-2012). The Excel original hung off a hotkey;
+ * Marketplace add-ons cannot register shortcuts, so Scopion is a persistent
+ * sidebar that FOLLOWS the grid selection (scopionObserve polling) and gives
+ * arrow-key walking of the reference list once the sidebar has focus.
+ */
+
+var SETTING_KEYS = ['showExternal', 'traverseHidden', 'showNamedRanges', 'followMode'];
+var BLANK_LABEL = '---BLANK CELL---';
+var WALK_HIGHLIGHT = '#ccff90'; // the Excel original painted the walked cell ColorIndex 4
+
+function onOpen() {
+  // AuthMode.NONE-safe: menu construction only, no spreadsheet reads.
+  SpreadsheetApp.getUi()
+    .createMenu('Scopion')
+    .addItem('Open Scopion', 'showScopionSidebar')
+    .addToUi();
+}
+
+function onInstall(e) {
+  onOpen(e);
+}
+
+function showScopionSidebar() {
+  var html = HtmlService.createHtmlOutputFromFile('Sidebar')
+    .setTitle('Scopion');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/** Macro alias for the bound-script build (Ctrl+Alt+Shift+1). */
+function scopionOpen() {
+  showScopionSidebar();
+}
+
+// ---------------------------------------------------------------------------
+// Settings (DocumentProperties; the Excel original used workbook defined names)
+// ---------------------------------------------------------------------------
+
+function scopionGetSettings() {
+  var out = {};
+  var props = null;
+  try {
+    props = PropertiesService.getDocumentProperties();
+  } catch (e) {
+    // view-only access: no document properties, fall through to defaults
+  }
+  for (var i = 0; i < SETTING_KEYS.length; i++) {
+    var raw = props ? props.getProperty('scopion.' + SETTING_KEYS[i]) : null;
+    out[SETTING_KEYS[i]] = raw === null ? true : raw === 'true';
+  }
+  return out;
+}
+
+function scopionSetSetting(key, value) {
+  if (SETTING_KEYS.indexOf(key) < 0) throw new Error('Unknown setting: ' + key);
+  // Best-effort: a viewer without edit rights cannot persist settings; the
+  // sidebar keeps its in-memory state, so failing loudly here would only
+  // break the toggle for read-only users.
+  try {
+    PropertiesService.getDocumentProperties()
+      .setProperty('scopion.' + key, value ? 'true' : 'false');
+  } catch (e) {}
+  return scopionGetSettings();
+}
+
+// ---------------------------------------------------------------------------
+// Selection identity: sheetId:row:col. Immutable against sheet renames, which
+// a name-keyed protocol would silently mis-resolve mid-session.
+// ---------------------------------------------------------------------------
+
+function sheetById(ss, sheetId) {
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === sheetId) return sheets[i];
+  }
+  return null;
+}
+
+function selectionInfo(ss) {
+  var range = ss.getActiveRange();
+  if (!range) return null;
+  var sheet = range.getSheet();
+  var cell = range.getCell(1, 1); // multi-cell selections audit the top-left
+  return {
+    key: sheet.getSheetId() + ':' + cell.getRow() + ':' + cell.getColumn(),
+    sheetId: sheet.getSheetId(),
+    sheetName: sheet.getName(),
+    row: cell.getRow(),
+    column: cell.getColumn(),
+    a1: cell.getA1Notation(),
+    isSingleCell: range.getNumRows() === 1 && range.getNumColumns() === 1
+  };
+}
+
+/**
+ * The follow-mode poll. Cheap when nothing changed; when the selection HAS
+ * changed it captures the coordinates and returns the full audit in the same
+ * round trip — a separate peek-then-audit pair would race against the user
+ * moving again in between.
+ */
+function scopionObserve(request) {
+  var ss = SpreadsheetApp.getActive();
+  var sel = selectionInfo(ss);
+  if (!sel) return { changed: false, selection: null };
+  if (request && request.knownKey === sel.key) {
+    return { changed: false, selection: { key: sel.key } };
+  }
+  var audit = scopionAuditCore({
+    sheetName: sel.sheetName,
+    a1: sel.a1,
+    mode: request && request.mode
+  });
+  return { changed: true, selection: sel, audit: audit };
+}
+
+/**
+ * Restore one previously highlighted cell to its recorded background.
+ * Failures (protected range, deleted sheet) are swallowed: losing a restore
+ * must never break navigation.
+ */
+function restoreHighlight(ss, restore) {
+  if (!restore || !restore.target || restore.target.sheetId == null) return;
+  try {
+    var sheet = sheetById(ss, restore.target.sheetId);
+    if (!sheet) return;
+    var cell = sheet.getRange(restore.target.row, restore.target.column);
+    if (restore.background && restore.background !== '#ffffff') {
+      cell.setBackground(restore.background);
+    } else {
+      cell.setBackground(null);
+    }
+  } catch (e) {}
+}
+
+/** Standalone restore, for ending a walk without another jump. */
+function scopionClearHighlight(restore) {
+  restoreHighlight(SpreadsheetApp.getActive(), restore);
+  return true;
+}
+
+/**
+ * Navigation. action "jump" moves the grid selection only (arrow-key walking);
+ * "navigateAndAudit" moves it AND audits the target as the new origin in one
+ * round trip (Enter drill-in / Back).
+ */
+function scopionNavigate(request) {
+  if (!request || (request.action !== 'jump' && request.action !== 'navigateAndAudit')) {
+    throw new Error('Unknown navigation action.');
+  }
+  var ss = SpreadsheetApp.getActive();
+  var sheet = sheetById(ss, request.target.sheetId);
+  if (!sheet) throw new Error('Sheet no longer exists.');
+  var row = Math.floor(request.target.row);
+  var column = Math.floor(request.target.column);
+  if (!(row >= 1) || !(column >= 1) ||
+      row > sheet.getMaxRows() || column > sheet.getMaxColumns()) {
+    throw new Error('Target is outside the grid.');
+  }
+
+  var unhidden = false;
+  if (sheet.isSheetHidden()) {
+    sheet.showSheet();
+    unhidden = true;
+  }
+  sheet.activate();
+  var range = sheet.getRange(row, column);
+  ss.setActiveRange(range);
+
+  // Walk highlight: paint the landed-on cell so the eye finds it instantly
+  // (the selection outline alone is easy to lose on a dense model). The
+  // previous walked cell is restored in the same round trip; the client keeps
+  // the single {target, background} record and sends it back on the next hop.
+  var highlight = null;
+  if (request.highlight && request.highlight.apply) {
+    restoreHighlight(ss, request.highlight.restore);
+    try {
+      var prevBackground = range.getBackground();
+      range.setBackground(WALK_HIGHLIGHT);
+      highlight = { background: prevBackground, applied: true };
+    } catch (e) {
+      highlight = { background: null, applied: false }; // protected range
+    }
+  } else if (request.highlight && request.highlight.restore) {
+    restoreHighlight(ss, request.highlight.restore);
+    highlight = { background: null, applied: false };
+  }
+
+  var selection = {
+    key: sheet.getSheetId() + ':' + row + ':' + column,
+    sheetId: sheet.getSheetId(),
+    sheetName: sheet.getName(),
+    row: row,
+    column: column,
+    a1: range.getA1Notation(),
+    sheetWasUnhidden: unhidden,
+    highlight: highlight
+  };
+
+  if (request.action === 'navigateAndAudit') {
+    return {
+      selection: selection,
+      audit: scopionAuditCore({
+        sheetName: sheet.getName(),
+        a1: range.getA1Notation(),
+        mode: request.mode
+      })
+    };
+  }
+  return { selection: selection };
+}
+
+/** Mode switches / refresh on the current origin (no navigation). */
+function scopionAudit(request) {
+  // Prefer the immutable target: a sheetName captured before a rename would
+  // resolve to "No such sheet" even though the sheet still exists.
+  if (request && request.target && request.target.sheetId != null) {
+    var sheet = sheetById(SpreadsheetApp.getActive(), request.target.sheetId);
+    if (!sheet) throw new Error('Sheet no longer exists.');
+    return scopionAuditCore({
+      sheetName: sheet.getName(),
+      a1: sheet.getRange(request.target.row, request.target.column).getA1Notation(),
+      mode: request.mode
+    });
+  }
+  return scopionAuditCore(request);
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {?Object} request {sheetName, a1, mode} — omit to audit the current
+ *   selection. `mode` is 'precedents' or 'dependents'.
+ */
+function scopionAuditCore(request) {
+  var started = Date.now();
+  var ss = SpreadsheetApp.getActive();
+  var settings = scopionGetSettings();
+  var mode = (request && request.mode) === 'dependents' ? 'dependents' : 'precedents';
+
+  var sheetName, a1;
+  if (request && request.sheetName) {
+    var validated = validateTarget(ss, request.sheetName, request.a1);
+    sheetName = validated.sheetName;
+    // Audit the top-left cell: getRange() rejects the unbounded "C:C" form, and
+    // a range has no single formula to report anyway.
+    var box = a1ToRect(validated.a1, sheetName);
+    a1 = numToCol(box.c1) + box.r1;
+  } else {
+    var active = ss.getActiveRange();
+    if (!active) throw new Error('Select a cell first.');
+    sheetName = active.getSheet().getName();
+    a1 = active.getCell(1, 1).getA1Notation();
+  }
+
+  var namedRanges = buildNamedRangeMap(ss);
+  var originSheet = ss.getSheetByName(sheetName);
+  var originCell = originSheet.getRange(a1);
+
+  var found, unresolved = [], skipped = [], scanStats = null;
+  if (mode === 'precedents') {
+    found = findPrecedents(ss, sheetName, a1, namedRanges);
+    unresolved = found.unresolved;
+  } else {
+    var dep = findDependents(ss, sheetName, a1, namedRanges);
+    found = { formula: originCell.getFormula(), targets: dep.targets };
+    skipped = dep.skipped;
+    scanStats = { elapsedMs: dep.elapsedMs, scannedFormulas: dep.scannedFormulas };
+  }
+
+  var visible = {};
+  var sheets = ss.getSheets();
+  for (var s = 0; s < sheets.length; s++) visible[sheets[s].getName()] = !sheets[s].isSheetHidden();
+
+  var targets = found.targets;
+  if (!settings.traverseHidden) {
+    targets = targets.filter(function (t) {
+      return t.external || visible[t.rect.sheetName] !== false;
+    });
+  }
+  if (!settings.showExternal) {
+    targets = targets.filter(function (t) { return !t.external; });
+  }
+
+  var rows = materializeRows(ss, targets, visible);
+
+  // Navigation identity for each row (sheetId:row:col of the row's top-left).
+  var idBySheet = {};
+  var allSheets = ss.getSheets();
+  for (var sIdx = 0; sIdx < allSheets.length; sIdx++) {
+    idBySheet[allSheets[sIdx].getName()] = allSheets[sIdx].getSheetId();
+  }
+  for (var rIdx = 0; rIdx < rows.length; rIdx++) {
+    var rw = rows[rIdx];
+    if (rw.external || !rw.jumpable) continue;
+    var box = a1ToRect(rw.address, rw.sheetName);
+    if (box && idBySheet[rw.sheetName] !== undefined) {
+      rw.target = { sheetId: idBySheet[rw.sheetName], row: box.r1, column: box.c1 };
+    } else {
+      rw.jumpable = false;
+    }
+  }
+
+  var originSheetId = null;
+  var origSheets = ss.getSheets();
+  for (var oIdx = 0; oIdx < origSheets.length; oIdx++) {
+    if (origSheets[oIdx].getName() === sheetName) { originSheetId = origSheets[oIdx].getSheetId(); break; }
+  }
+  var originBox = a1ToRect(a1, sheetName);
+  return {
+    origin: {
+      sheetName: sheetName,
+      sheetId: originSheetId,
+      a1: a1,
+      key: originSheetId + ':' + originBox.r1 + ':' + originBox.c1,
+      target: { sheetId: originSheetId, row: originBox.r1, column: originBox.c1 },
+      formula: found.formula || '',
+      value: displayValue(originCell)
+    },
+    mode: mode,
+    rows: rows,
+    unresolved: unresolved,
+    skippedSheets: skipped,
+    scanStats: scanStats,
+    namedRanges: settings.showNamedRanges ? namesCovering(namedRanges, sheetName, a1) : [],
+    hasBlank: rows.some(function (r) { return r.isBlank; }),
+    settings: settings,
+    elapsedMs: Date.now() - started
+  };
+}
+
+/** Reject anything from the browser that is not a real sheet and a legal A1 range. */
+function validateTarget(ss, sheetName, a1) {
+  var sheet = ss.getSheetByName(String(sheetName));
+  if (!sheet) throw new Error('No such sheet: ' + sheetName);
+  var r = a1ToRect(String(a1), sheet.getName());
+  if (!r) throw new Error('Not a valid reference: ' + a1);
+  // A formula may reference a cell outside the current grid (a deleted row, a
+  // sheet that shrank). getRange() throws there, so it is caught here instead.
+  if (r.r1 > sheet.getMaxRows() || r.c1 > sheet.getMaxColumns()) {
+    throw new Error(a1 + ' is outside the grid of "' + sheet.getName() + '".');
+  }
+  return { sheetName: sheet.getName(), a1: String(a1).replace(/\$/g, '') };
+}
+
+/** Defined names whose range covers the audited cell (the original's txtNames box). */
+function namesCovering(namedRanges, sheetName, a1) {
+  var cell = a1ToRect(a1, sheetName);
+  var out = [];
+  for (var key in namedRanges) {
+    var nr = namedRanges[key];
+    if (rectsOverlap(nr.rect, cell)) out.push(nr.name);
+  }
+  return out;
+}
+
+/**
+ * Read value, background and formula for every target, batching by sheet.
+ * One getValues/getBackgrounds/getFormulas per sheet when the targets' bounding
+ * box is small enough, otherwise per target — a formula referencing both A1 and
+ * ZZ100000 would otherwise pull the whole sheet.
+ */
+function materializeRows(ss, targets, visible) {
+  var bySheet = {};
+  var rows = [];
+
+  for (var i = 0; i < targets.length; i++) {
+    var t = targets[i];
+    if (t.external) {
+      rows.push({
+        index: i, external: true, sheetName: '(external)', flag: 'EX',
+        address: t.a1, value: '', background: '', subFormula: t.raw,
+        url: safeUrl(t.url), isBlank: false, jumpable: false
+      });
+      continue;
+    }
+    if (!bySheet[t.rect.sheetName]) bySheet[t.rect.sheetName] = [];
+    bySheet[t.rect.sheetName].push({ index: i, target: t });
+  }
+
+  for (var sheetName in bySheet) {
+    var sheet = ss.getSheetByName(sheetName);
+    var items = bySheet[sheetName];
+    if (!sheet) {
+      for (var m = 0; m < items.length; m++) {
+        rows.push(missingSheetRow(items[m], sheetName));
+      }
+      continue;
+    }
+
+    var maxRow = Math.max(sheet.getLastRow(), 1);
+    var maxCol = Math.max(sheet.getLastColumn(), 1);
+    var box = boundingBox(items, maxRow, maxCol);
+    var useBatch = box && (box.r2 - box.r1 + 1) * (box.c2 - box.c1 + 1) <= MAX_MATERIALIZE_BBOX;
+
+    var values = null, backgrounds = null, formulas = null;
+    if (useBatch) {
+      var range = sheet.getRange(box.r1, box.c1, box.r2 - box.r1 + 1, box.c2 - box.c1 + 1);
+      values = range.getDisplayValues();
+      backgrounds = range.getBackgrounds();
+      formulas = range.getFormulas();
+    }
+
+    for (var k = 0; k < items.length; k++) {
+      var item = items[k];
+      var rct = item.target.rect;
+      var isRange = rct.r1 !== rct.r2 || rct.c1 !== rct.c2;
+
+      // Beyond the used range there is nothing to read. Clamping to the last
+      // used cell would show a different cell's value under the right address.
+      var withinGrid = rct.r1 <= sheet.getMaxRows() && rct.c1 <= sheet.getMaxColumns();
+      if (rct.r1 > maxRow || rct.c1 > maxCol) {
+        rows.push({
+          index: item.index, external: false, sheetName: sheetName,
+          flag: visible[sheetName] === false ? 'H' : '',
+          address: rectToA1(rct), value: BLANK_LABEL,
+          background: '', subFormula: item.target.raw || '',
+          viaName: item.target.viaName || '', dynamic: !!item.target.dynamic,
+          sourceFormula: item.target.sourceFormula || '',
+          // A range entirely outside the used area is empty too, and an empty
+          // referenced range is exactly the modelling error the alert is for.
+          isBlank: true, jumpable: withinGrid
+        });
+        continue;
+      }
+      var r = rct.r1, c = rct.c1;
+
+      var display, background, formula;
+      if (useBatch) {
+        display = values[r - box.r1][c - box.c1];
+        background = backgrounds[r - box.r1][c - box.c1];
+        formula = formulas[r - box.r1][c - box.c1];
+      } else {
+        var cellRange = sheet.getRange(r, c);
+        display = cellRange.getDisplayValue();
+        background = cellRange.getBackground();
+        formula = cellRange.getFormula();
+      }
+
+      // "Blank" means structurally empty. A formula returning "" displays as
+      // empty but is not a missing input, so it must not raise the alert.
+      var isBlank = !isRange && display === '' && formula === '';
+
+      rows.push({
+        index: item.index,
+        external: false,
+        sheetName: sheetName,
+        flag: visible[sheetName] === false ? 'H' : '',
+        address: rectToA1(rct),
+        value: isBlank ? BLANK_LABEL : (isRange ? '(' + rectToA1(rct) + ')' : display),
+        background: background,
+        subFormula: item.target.raw || '',
+        viaName: item.target.viaName || '',
+        dynamic: !!item.target.dynamic,
+        sourceFormula: item.target.sourceFormula || '',
+        isBlank: isBlank,
+        jumpable: true
+      });
+    }
+  }
+
+  rows.sort(function (a, b) { return a.index - b.index; });
+  return rows;
+}
+
+function missingSheetRow(item, sheetName) {
+  return {
+    index: item.index, external: false, sheetName: sheetName, flag: '?',
+    address: rectToA1(item.target.rect), value: '(sheet not found)',
+    background: '', subFormula: item.target.raw || '', isBlank: false, jumpable: false
+  };
+}
+
+function boundingBox(items, maxRow, maxCol) {
+  var r1 = null, c1 = null, r2 = null, c2 = null;
+  for (var i = 0; i < items.length; i++) {
+    var rct = items[i].target.rect;
+    if (rct.r1 > maxRow || rct.c1 > maxCol) continue; // handled as blank, never read
+    var r = rct.r1, c = rct.c1;
+    r1 = r1 === null ? r : Math.min(r1, r);
+    c1 = c1 === null ? c : Math.min(c1, c);
+    r2 = r2 === null ? r : Math.max(r2, r);
+    c2 = c2 === null ? c : Math.max(c2, c);
+  }
+  return r1 === null ? null : { r1: r1, c1: c1, r2: r2, c2: c2 };
+}
+
+/**
+ * IMPORTRANGE's first argument is spreadsheet content, so it is untrusted input
+ * to the sidebar. Only a plain https link is ever handed back for opening.
+ */
+function safeUrl(url) {
+  var text = String(url || '').trim();
+  if (/^https:\/\/[^\s"'<>]+$/.test(text)) return text;
+  // IMPORTRANGE accepts a bare spreadsheet key as well as a full URL.
+  if (/^[A-Za-z0-9_-]{20,}$/.test(text)) {
+    return 'https://docs.google.com/spreadsheets/d/' + text;
+  }
+  return '';
+}
+
+function displayValue(range) {
+  try { return range.getDisplayValue(); } catch (e) { return ''; }
+}
+
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+
+/** Re-hide sheets this session unhid, when the user asks to undo that. */
+function scopionRehide(sheetNames, originTarget) {
+  var ss = SpreadsheetApp.getActive();
+  // After walking into a hidden sheet, that sheet IS the active sheet and
+  // could never be re-hidden. Return to the audit origin first.
+  if (originTarget && originTarget.sheetId != null) {
+    var origin = sheetById(ss, originTarget.sheetId);
+    if (origin && !origin.isSheetHidden() &&
+        sheetNames.indexOf(origin.getName()) < 0) {
+      origin.activate();
+      ss.setActiveRange(origin.getRange(originTarget.row, originTarget.column));
+    }
+  }
+  var activeName = ss.getActiveSheet().getName();
+  var rehidden = [];
+  for (var i = 0; i < sheetNames.length; i++) {
+    var sheet = ss.getSheetByName(sheetNames[i]);
+    if (!sheet || sheet.getName() === activeName) continue;
+    sheet.hideSheet();
+    rehidden.push(sheet.getName());
+  }
+  return rehidden;
+}
+
+
+// the server functions live inside this IIFE; expose them for the shim
+['scopionObserve', 'scopionNavigate', 'scopionAudit', 'scopionGetSettings',
+ 'scopionSetSetting', 'scopionRehide', 'scopionClearHighlight',
+ 'scopionAuditCore'].forEach((n) => { window[n] = eval(n); });
+
+// ---- google.script.run shim with latency ------------------------------------
+window.__rpcLog = [];
+window.__latency = 250;
+window.google = { script: { run: null } };
+function makeRunner() {
+  let ok = function () {}, fail = function () {};
+  const runner = {
+    withSuccessHandler(f) { ok = f; return runner; },
+    withFailureHandler(f) { fail = f; return runner; }
+  };
+  ['scopionObserve', 'scopionNavigate', 'scopionAudit', 'scopionGetSettings',
+   'scopionSetSetting', 'scopionRehide', 'scopionClearHighlight'].forEach((name) => {
+    runner[name] = function () {
+      const args = Array.from(arguments);
+      window.__rpcLog.push({ name, args: JSON.parse(JSON.stringify(args)) });
+      setTimeout(() => {
+        try {
+          const result = window[name].apply(null, args);
+          ok(JSON.parse(JSON.stringify(result === undefined ? null : result)));
+        } catch (e) { fail(e); }
+      }, window.__latency);
+    };
+  });
+  return runner;
+}
+Object.defineProperty(window.google.script, 'run', { get: makeRunner });
+})();
+</script>
+<script>
+'use strict';
+
+// ---------------------------------------------------------------------------
+// State. One machine: FOLLOWING <-> WALKING, with navigationBusy gating polls.
+// ---------------------------------------------------------------------------
+var S = {
+  mode: 'precedents',
+  audit: null,            // last AuditResult
+  rows: [],               // jumpable view of audit.rows
+  activeIndex: -1,        // roving highlight
+  history: [],            // stack of {target:{sheetId,row,column}, label:"Sheet!A1"}
+  unhidden: [],           // sheet names this session unhid
+  settings: null,
+
+  // follow loop
+  follow: true,
+  lastSeenKey: null,      // last selection key the poller observed
+  suppressedKey: null,    // our own jump's landing key — poller ignores it
+  echoExpiry: 0,          // transit window: polls landing mid-jump are ignored
+  navCount: 0,            // navigation RPCs in flight (jump+drill can overlap) -> no polling
+  generation: 0,          // bumped by every user navigation; stale polls drop
+  pollTimer: null,
+  pollBusy: false,
+  lastChangeAt: Date.now(),
+  lastInteractAt: Date.now(),
+  failStreak: 0,
+  sleeping: false,
+
+  // walk highlight: the one cell currently painted, with its original
+  // background, so every hop (and the end of the walk) can restore it
+  highlight: null,        // {target:{sheetId,row,column}, background} | null
+
+  // jump queue (latest-wins, single flight, never auto-retried)
+  desiredTarget: null,
+  committedTarget: null,
+  jumpInFlight: false,
+  jumpTimer: null
+};
+
+var POLL_FAST = 800, POLL_WARM = 1500, POLL_IDLE = 4000;
+var WARM_AFTER = 8000, IDLE_AFTER = 30000, SLEEP_AFTER = 15 * 60 * 1000;
+
+function rpc(name) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    var runner = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject);
+    runner[name].apply(runner, args);
+  });
+}
+
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function keyOf(t) { return t ? t.sheetId + ':' + t.row + ':' + t.column : ''; }
+
+// ---------------------------------------------------------------------------
+// Follow loop. Non-overlapping: the next poll is scheduled only after the
+// previous one completes. Cadence adapts to time since the last observed
+// selection change.
+//
+// MEASURED, not assumed: the Apps Script sidebar iframe reports
+// document.hidden === true at all times (sandboxed iframe), so the Page
+// Visibility API can never gate this loop — a hidden-check here halts
+// polling permanently. Background suppression is therefore idle backoff +
+// deep sleep only.
+// ---------------------------------------------------------------------------
+function scheduleNextPoll() {
+  clearTimeout(S.pollTimer);
+  if (!S.follow || S.sleeping) return;
+  var since = Date.now() - S.lastChangeAt;
+  var base = since < WARM_AFTER ? POLL_FAST : since < IDLE_AFTER ? POLL_WARM : POLL_IDLE;
+  var jitter = (Math.random() - 0.5) * 500;
+  S.pollTimer = setTimeout(pollNow, Math.max(300, base + jitter));
+}
+
+function pollNow() {
+  if (!S.follow || S.sleeping || S.navCount > 0 || S.pollBusy) {
+    scheduleNextPoll();
+    return;
+  }
+  if (Date.now() - Math.max(S.lastChangeAt, S.lastInteractAt) > SLEEP_AFTER) {
+    enterSleep();
+    return;
+  }
+  S.pollBusy = true;
+  var gen = S.generation;
+  rpc('scopionObserve', { knownKey: S.lastSeenKey, mode: S.mode })
+    .then(function (res) {
+      S.pollBusy = false;
+      S.failStreak = 0;
+      setStatus('ok');
+      if (gen !== S.generation || !S.follow || !res || !res.selection) { scheduleNextPoll(); return; }
+      var key = res.selection.key;
+      if (!res.changed) { scheduleNextPoll(); return; }
+
+      // Our own jump landing confirms and is remembered.
+      if (key === S.suppressedKey) {
+        S.lastSeenKey = key;
+        scheduleNextPoll();
+        return;
+      }
+      // A foreign key during the transit window is IGNORED WITHOUT being
+      // remembered: advancing lastSeenKey here would make the server report
+      // changed:false forever and freeze the sidebar on a stale origin
+      // (found independently by both external reviewers).
+      if (Date.now() < S.echoExpiry) {
+        scheduleNextPoll();
+        return;
+      }
+
+      // Genuine user move: new origin, new history root. The walk is over,
+      // so the painted cell goes back to its own colour.
+      clearHighlight();
+      S.lastSeenKey = key;
+      S.suppressedKey = null;
+      S.lastChangeAt = Date.now();
+      S.history = [];
+      acceptAudit(res.audit, /*focusList=*/false);
+      scheduleNextPoll();
+    })
+    .catch(function () {
+      S.pollBusy = false;
+      S.failStreak++;
+      if (S.failStreak >= 3) { setStatus('error'); enterSleep('connection lost — click to retry'); return; }
+      scheduleNextPoll();
+    });
+}
+
+function enterSleep(label) {
+  S.sleeping = true;
+  clearTimeout(S.pollTimer);
+  setStatus('paused');
+  $('pollLabel').textContent = label || 'sleeping — click to resume';
+}
+function wake() {
+  if (!S.sleeping) return;
+  S.sleeping = false;
+  S.failStreak = 0;
+  S.lastInteractAt = Date.now();
+  setStatus(S.follow ? 'ok' : 'paused');
+  $('pollLabel').textContent = S.follow ? 'following' : 'paused';
+  scheduleNextPoll();
+  if (S.follow) pollNow();
+}
+
+['mousemove', 'keydown', 'click'].forEach(function (evt) {
+  document.addEventListener(evt, function () {
+    S.lastInteractAt = Date.now();
+    if (S.sleeping) wake();
+  }, { passive: true });
+});
+
+function setStatus(kind) {
+  var dot = $('statusDot');
+  dot.className = 'dot' + (kind === 'ok' ? '' : kind === 'paused' ? ' paused' : ' error');
+}
+
+// ---------------------------------------------------------------------------
+// Jump queue: highlight moves instantly; at most one navigation RPC in
+// flight; only the newest target is ever sent; a failed jump is dropped, not
+// retried (a late retry would overwrite whatever the user did meanwhile).
+// ---------------------------------------------------------------------------
+function requestJump(target, noPaint) {
+  S.desiredTarget = target;
+  S.paintWalk = !noPaint;
+  S.suppressedKey = keyOf(target);
+  S.echoExpiry = Date.now() + 2500;
+  clearTimeout(S.jumpTimer);
+  S.jumpTimer = setTimeout(pumpJumps, 110);
+}
+
+function pumpJumps() {
+  if (S.jumpInFlight || !S.desiredTarget) return;
+  if (keyOf(S.desiredTarget) === keyOf(S.committedTarget)) return;
+  var target = S.desiredTarget;
+  var gen = S.generation;
+  S.jumpInFlight = true;
+  S.navCount++;
+  rpc('scopionNavigate', { action: 'jump', target: target, highlight: highlightRequest() })
+    .then(function (res) {
+      S.jumpInFlight = false;
+      S.navCount--;
+      // A drill/back superseded this walk while it was in flight: its result
+      // must not touch any state (it would move the grid BACK to the older
+      // target and corrupt the suppression keys).
+      if (gen !== S.generation) { scheduleNextPoll(); return; }
+      consumeHighlight(res.selection, target);
+      S.committedTarget = target;
+      S.lastSeenKey = res.selection.key;
+      S.suppressedKey = res.selection.key;
+      if (res.selection.sheetWasUnhidden) noteUnhidden(res.selection.sheetName);
+      refocusList();
+      if (keyOf(S.desiredTarget) !== keyOf(target)) { pumpJumps(); return; }
+      scheduleNextPoll();
+    })
+    .catch(function (e) {
+      S.jumpInFlight = false;
+      S.navCount--;
+      toastError(e);
+      // Never auto-retry the FAILED target, but a NEWER queued target is the
+      // user's latest intent and must still be sent.
+      if (gen === S.generation && S.desiredTarget &&
+          keyOf(S.desiredTarget) !== keyOf(target)) {
+        pumpJumps();
+        return;
+      }
+      scheduleNextPoll();
+    });
+}
+
+function highlightRequest() {
+  return { apply: S.paintWalk !== false, restore: S.highlight };
+}
+
+function consumeHighlight(selection, target) {
+  if (selection.highlight && selection.highlight.applied) {
+    S.highlight = { target: target, background: selection.highlight.background };
+  } else {
+    S.highlight = null;
+  }
+}
+
+/** End of a walk: put the painted cell back. Fire-and-forget. */
+function clearHighlight() {
+  if (!S.highlight) return;
+  var restore = S.highlight;
+  S.highlight = null;
+  rpc('scopionClearHighlight', restore).catch(function () {});
+}
+
+/**
+ * Take the keyboard back after a jump.
+ *
+ * MEASURED: a single focus() is not enough. The server-side activate() and the
+ * highlight repaint make Sheets re-render the grid and grab focus AFTER our
+ * call lands, so the next arrow key goes to the grid and the walk dies after
+ * one hop (observed live: only one scopionNavigate for three ArrowDowns).
+ * Re-asserting across the render window fixes it.
+ */
+function refocusList() {
+  var list = $('list');
+  [0, 120, 320, 650].forEach(function (delay) {
+    setTimeout(function () {
+      if (document.activeElement !== list) list.focus();
+    }, delay);
+  });
+}
+
+function noteUnhidden(name) {
+  if (S.unhidden.indexOf(name) < 0) S.unhidden.push(name);
+  $('chipbar').style.display = '';
+}
+
+// ---------------------------------------------------------------------------
+// Drill / back: one navigateAndAudit round trip. Drilling pushes the current
+// origin; walking never touches history.
+// ---------------------------------------------------------------------------
+/**
+ * historyOp mutates S.history ONLY after the navigation succeeds, so a failed
+ * drill/back never loses breadcrumbs: 'push' records the outgoing origin,
+ * 'pop' drops the entry just returned to, {truncate:n} cuts to a chip.
+ */
+function drill(target, historyOp) {
+  var gen = ++S.generation;
+  S.navCount++;
+  S.desiredTarget = null;
+  clearTimeout(S.jumpTimer);
+  S.suppressedKey = keyOf(target);
+  S.echoExpiry = Date.now() + 2500;
+  var outgoing = S.audit ? S.audit.origin.target : null;
+  var outgoingLabel = S.audit ? S.audit.origin.sheetName + '!' + S.audit.origin.a1 : '';
+  rpc('scopionNavigate', { action: 'navigateAndAudit', target: target, mode: S.mode, highlight: highlightRequest() })
+    .then(function (res) {
+      S.navCount--;
+      if (gen !== S.generation) { scheduleNextPoll(); return; }
+      consumeHighlight(res.selection, target);
+      if (historyOp === 'push' && outgoing) {
+        S.history.push({ target: outgoing, label: outgoingLabel });
+      }
+      else if (historyOp === 'pop') S.history.pop();
+      else if (historyOp && historyOp.truncate !== undefined) S.history = S.history.slice(0, historyOp.truncate);
+      S.lastSeenKey = res.selection.key;
+      S.suppressedKey = res.selection.key;
+      S.committedTarget = target;
+      S.lastChangeAt = Date.now();
+      if (res.selection.sheetWasUnhidden) noteUnhidden(res.selection.sheetName);
+      acceptAudit(res.audit, /*focusList=*/true);
+      scheduleNextPoll();
+    })
+    .catch(function (e) {
+      S.navCount--;
+      toastError(e);
+      scheduleNextPoll();
+    });
+}
+
+function goBack() {
+  var prev = S.history[S.history.length - 1];
+  if (prev) drill(prev.target, 'pop');
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function acceptAudit(audit, focusList) {
+  if (!audit) return;
+  S.audit = audit;
+  S.rows = audit.rows;
+  S.activeIndex = -1;
+  S.committedTarget = null;
+  S.desiredTarget = null;
+
+  var o = audit.origin;
+  $('originCard').style.display = '';
+  $('originAddr').textContent = o.sheetName + '!' + o.a1;
+  $('originVal').textContent = o.value;
+  $('originFormula').textContent = o.formula || '(no formula)';
+  $('originNames').textContent =
+    audit.namedRanges && audit.namedRanges.length ? audit.namedRanges.join(' | ') : '';
+  $('originNames').style.display =
+    audit.namedRanges && audit.namedRanges.length ? '' : 'none';
+
+  renderCrumbs();
+  renderWarnings(audit);
+  renderList(audit);
+  renderStats(audit);
+
+  // Focus policy: sidebar-initiated renders keep keyboard control; a
+  // follow-poll render must never steal focus from the grid.
+  if (focusList) refocusList();
+  updateFocusHint();
+}
+
+function renderCrumbs() {
+  var el = $('crumbs');
+  el.innerHTML = '';
+  if (!S.history.length) return;
+  S.history.forEach(function (entry, i) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = entry.label || '?';
+    chip.onclick = function () { drill(entry.target, { truncate: i }); };
+    el.appendChild(chip);
+    var sep = document.createElement('span');
+    sep.className = 'sep';
+    sep.textContent = '›';
+    el.appendChild(sep);
+  });
+  var cur = document.createElement('span');
+  cur.textContent = S.audit ? S.audit.origin.sheetName + '!' + S.audit.origin.a1 : '';
+  el.appendChild(cur);
+}
+
+function renderWarnings(audit) {
+  var html = '';
+  if (audit.unresolved && audit.unresolved.length) {
+    html += '<div class="warn amber"><b>Unresolved dynamic references (' +
+      audit.unresolved.length + ')</b><ul>';
+    audit.unresolved.forEach(function (u) {
+      html += '<li><span class="mono">' + esc(u.raw) + '</span> — ' + esc(u.reason) + '</li>';
+    });
+    html += '</ul></div>';
+  }
+  if (audit.skippedSheets && audit.skippedSheets.length) {
+    html += '<div class="warn amber"><b>Not scanned:</b> ' +
+      esc(audit.skippedSheets.join(', ')) + '</div>';
+  }
+  $('warnings').innerHTML = html;
+}
+
+function renderList(audit) {
+  var list = $('list');
+  list.className = audit.hasBlank ? 'blank-alert' : '';
+  list.innerHTML = '';
+
+  if (!audit.rows.length) {
+    list.innerHTML = '<div class="empty">' +
+      (audit.origin.formula ? 'No references found.' :
+        (S.mode === 'precedents' ? 'Not a formula cell.' : 'No dependents found.')) +
+      '</div>';
+    return;
+  }
+
+  audit.rows.forEach(function (row, i) {
+    var el = document.createElement('div');
+    el.className = 'row' + (row.jumpable || row.external ? '' : ' dead');
+    el.id = 'row-' + i;
+    el.setAttribute('role', 'option');
+    var badges = '';
+    if (row.flag === 'H') badges += '<span class="badge h" title="hidden sheet">H</span>';
+    if (row.flag === 'EX') badges += '<span class="badge ex" title="external file">EX</span>';
+    if (row.isBlank) badges += '<span class="badge blank">BLANK</span>';
+    // The swatch mirrors the cell's own fill colour — a real modelling signal.
+    // An uncoloured cell gets NO swatch: an empty outlined square reads as a
+    // checkbox and begs to be clicked.
+    var colour = safeColour(row.background);
+    var swatch = (colour === 'transparent' || /^#f{6}$/i.test(colour)) ? '' :
+      '<span class="swatch" style="background:' + colour + '" title="cell colour"></span>';
+    var isRangeRow = row.address.indexOf(':') >= 0;
+    el.innerHTML =
+      '<div class="l1">' +
+        '<span class="addr">' + esc(row.sheetName + '!' + row.address) + '</span>' + badges +
+        '<span class="val">' + esc(row.isBlank ? '' : (isRangeRow ? '—' : row.value)) + '</span>' +
+        swatch +
+      '</div>' +
+      '<div class="l2 mono">' + esc(row.sourceFormula || row.subFormula) +
+        (row.viaName ? ' [' + esc(row.viaName) + ']' : '') + '</div>';
+    el.onclick = function () {
+      $('list').focus();
+      setActive(i, /*jump=*/true);
+    };
+    el.ondblclick = function () { activateRow(i); };
+    list.appendChild(el);
+  });
+}
+
+function renderStats(audit) {
+  var text = audit.rows.length + ' refs · ' + audit.elapsedMs + ' ms';
+  if (audit.scanStats) text += ' · ' + audit.scanStats.scannedFormulas + ' formulas';
+  $('stats').textContent = text;
+}
+
+function safeColour(v) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')) ? v : 'transparent';
+}
+
+function toastError(e) {
+  $('warnings').innerHTML =
+    '<div class="warn red">' + esc(e && e.message || 'failed') + '</div>' +
+    $('warnings').innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard: the list owns arrows while focused. Follow renders never steal
+// focus, so a hint shows how to take control.
+// ---------------------------------------------------------------------------
+function setActive(i, jump) {
+  if (!S.rows.length) return;
+  i = Math.max(0, Math.min(S.rows.length - 1, i));
+  var prev = document.querySelector('.row.active');
+  if (prev) prev.classList.remove('active');
+  S.activeIndex = i;
+  var el = $('row-' + i);
+  if (el) {
+    el.classList.add('active');
+    el.scrollIntoView({ block: 'nearest' });
+    $('list').setAttribute('aria-activedescendant', el.id);
+  }
+  var row = S.rows[i];
+  if (jump && row && row.jumpable && row.target) requestJump(row.target, false);
+}
+
+function activateRow(i) {
+  var row = S.rows[i];
+  if (!row) return;
+  if (row.external) {
+    if (row.url) window.open(row.url, '_blank');
+    return;
+  }
+  if (row.jumpable && row.target) drill(row.target, 'push');
+}
+
+$('list').addEventListener('keydown', function (ev) {
+  var k = ev.key;
+  if (k === 'ArrowDown' || k === 'j') { setActive(S.activeIndex + 1, true); }
+  else if (k === 'ArrowUp' || k === 'k') { setActive(S.activeIndex - 1, true); }
+  else if (k === 'PageDown') { setActive(S.activeIndex + 10, true); }
+  else if (k === 'PageUp') { setActive(S.activeIndex - 10, true); }
+  else if (k === 'Home') { setActive(0, true); }
+  else if (k === 'End') { setActive(S.rows.length - 1, true); }
+  else if (k === 'Enter' || k === 'ArrowRight') {
+    if (S.activeIndex >= 0) activateRow(S.activeIndex);
+  }
+  else if (k === 'ArrowLeft' || k === 'Backspace') { goBack(); }
+  else if (k === 'Escape') {
+    // End of walk: return to the origin WITHOUT painting it — the walk
+    // highlight marks walked-to references, not the resting position.
+    if (S.audit) { clearHighlight(); requestJump(S.audit.origin.target, true); }
+  }
+  else if (k === 'p') { setMode('precedents'); }
+  else if (k === 'd') { setMode('dependents'); }
+  else return;
+  ev.preventDefault();
+});
+
+window.addEventListener('blur', updateFocusHint);
+window.addEventListener('focus', updateFocusHint);
+$('list').addEventListener('focus', updateFocusHint);
+$('list').addEventListener('blur', function () { setTimeout(updateFocusHint, 50); });
+function updateFocusHint() {
+  var owns = document.activeElement === $('list');
+  $('focusHint').style.display = owns || !S.rows.length ? 'none' : '';
+}
+
+// ---------------------------------------------------------------------------
+// Modes / settings / chips
+// ---------------------------------------------------------------------------
+function setMode(mode) {
+  if (S.mode === mode || !S.audit) return;
+  S.mode = mode;
+  $('modePrec').className = mode === 'precedents' ? 'on' : '';
+  $('modeDep').className = mode === 'dependents' ? 'on' : '';
+  var o = S.audit.origin;
+  var gen = ++S.generation;
+  rpc('scopionAudit', { target: o.target, mode: mode })
+    .then(function (audit) {
+      if (gen !== S.generation) return; // superseded by newer navigation
+      acceptAudit(audit, true);
+    })
+    .catch(toastError);
+}
+$('modePrec').onclick = function () { setMode('precedents'); };
+$('modeDep').onclick = function () { setMode('dependents'); };
+
+$('followPill').onclick = function () {
+  S.follow = !S.follow;
+  this.className = 'pill' + (S.follow ? ' on' : '');
+  $('pollLabel').textContent = S.follow ? 'following' : 'paused';
+  setStatus(S.follow ? 'ok' : 'paused');
+  rpc('scopionSetSetting', 'followMode', S.follow).catch(function () {});
+  if (S.follow) { S.sleeping = false; pollNow(); }
+  else clearTimeout(S.pollTimer);
+};
+
+$('btnRehide').onclick = function () {
+  rpc('scopionRehide', S.unhidden, S.audit ? S.audit.origin.target : null).then(function (done) {
+    S.unhidden = S.unhidden.filter(function (n) { return done.indexOf(n) < 0; });
+    if (!S.unhidden.length) $('chipbar').style.display = 'none';
+  }).catch(toastError);
+};
+
+$('btnHome').onclick = function () {
+  if (S.audit) { clearHighlight(); requestJump(S.audit.origin.target, true); }
+};
+
+['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
+  $(key).onchange = function () {
+    var checked = this.checked;
+    // The save is best-effort: a viewer without edit rights cannot write
+    // DocumentProperties, but the re-audit must still run for them.
+    rpc('scopionSetSetting', key, checked).catch(function () {}).then(function () {
+      if (!S.audit) return;
+      var o = S.audit.origin;
+      var gen = ++S.generation;
+      rpc('scopionAudit', { target: o.target, mode: S.mode })
+        .then(function (audit) {
+          if (gen !== S.generation) return;
+          // Deliberate: a form-control-initiated render does not steal focus
+          // from the control (SOL flagged this against the stated policy;
+          // the policy is refined instead: only LIST-initiated renders focus
+          // the list).
+          acceptAudit(audit, false);
+        })
+        .catch(toastError);
+    });
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Boot: settings, then first observe (no knownKey -> immediate audit).
+// ---------------------------------------------------------------------------
+$('pollLabel').textContent = 'starting…';
+rpc('scopionGetSettings').then(function (settings) {
+  S.settings = settings;
+  S.follow = settings.followMode !== false;
+  $('followPill').className = 'pill' + (S.follow ? ' on' : '');
+  ['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
+    if ($(key)) $(key).checked = settings[key];
+  });
+  return rpc('scopionObserve', { knownKey: null, mode: S.mode });
+}).then(function (res) {
+  $('pollLabel').textContent = S.follow ? 'following' : 'paused';
+  if (res && res.selection) {
+    S.lastSeenKey = res.selection.key;
+    if (res.audit) acceptAudit(res.audit, true);
+  }
+  scheduleNextPoll();
+}).catch(function (e) {
+  toastError(e);
+  $('pollLabel').textContent = 'boot failed — following will retry';
+  scheduleNextPoll();
+});
+</script>
+</body>
+</html>

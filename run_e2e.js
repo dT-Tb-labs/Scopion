@@ -34,6 +34,13 @@ class Range {
   getValue() { return this._cell(0, 0).value; }
   getDisplayValue() { const v = this._cell(0, 0).value; return v === '' || v === null ? '' : String(v); }
   getBackground() { return this._cell(0, 0).background; }
+  setBackground(colour) {
+    const r = this.r1, c = this.c1, sh = this.sheet;
+    if (!sh.cells[r]) sh.cells[r] = {};
+    if (!sh.cells[r][c]) sh.cells[r][c] = { formula: '', value: '', background: '#ffffff' };
+    sh.cells[r][c].background = colour === null ? '#ffffff' : colour;
+    return this;
+  }
   _grid(pick) {
     const out = [];
     for (let r = 0; r < this.nr; r++) { const row = [];
@@ -252,6 +259,19 @@ check('we are standing on the hidden sheet', ss.getActiveSheet().getName(), 'Hid
 const rehidden = sandbox.scopionRehide(['Hidden Calc'], { sheetId: modelSheet.getSheetId(), row: 7, column: 2 });
 check('re-hide hops to the origin and actually hides', rehidden, ['Hidden Calc']);
 check('the selection is back at the origin', ss.getActiveRange().getA1Notation(), 'B7');
+
+console.log('walk highlight');
+const hidId = hid.getSheetId(), modId = modelSheet.getSheetId();
+hid.getRange('A1').setBackground('#ffe0e0'); // pre-existing user colour
+const h1 = sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hidId, row: 1, column: 1 }, highlight: { apply: true, restore: null } });
+check('the landed cell is painted', hid.getRange('A1').getBackground(), '#ccff90');
+check('and its original colour is returned', h1.selection.highlight.background, '#ffe0e0');
+const h2 = sandbox.scopionNavigate({ action: 'jump', target: { sheetId: modId, row: 3, column: 2 }, highlight: { apply: true, restore: { target: { sheetId: hidId, row: 1, column: 1 }, background: h1.selection.highlight.background } } });
+check('the next hop restores the previous cell', hid.getRange('A1').getBackground(), '#ffe0e0');
+check('and paints the new one', modelSheet.getRange('B3').getBackground(), '#ccff90');
+sandbox.scopionClearHighlight({ target: { sheetId: modId, row: 3, column: 2 }, background: h2.selection.highlight.background });
+check('clearing restores a plain cell to white', modelSheet.getRange('B3').getBackground(), '#ffffff');
+sandbox.scopionRehide(['Hidden Calc'], { sheetId: modId, row: 7, column: 2 });
 
 console.log('grid bounds');
 let outOfGrid = '';

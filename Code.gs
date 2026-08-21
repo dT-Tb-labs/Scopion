@@ -12,6 +12,7 @@
 
 var SETTING_KEYS = ['showExternal', 'traverseHidden', 'showNamedRanges', 'followMode'];
 var BLANK_LABEL = '---BLANK CELL---';
+var WALK_HIGHLIGHT = '#ccff90'; // the Excel original painted the walked cell ColorIndex 4
 
 function onOpen() {
   // AuthMode.NONE-safe: menu construction only, no spreadsheet reads.
@@ -118,6 +119,31 @@ function scopionObserve(request) {
 }
 
 /**
+ * Restore one previously highlighted cell to its recorded background.
+ * Failures (protected range, deleted sheet) are swallowed: losing a restore
+ * must never break navigation.
+ */
+function restoreHighlight(ss, restore) {
+  if (!restore || !restore.target || restore.target.sheetId == null) return;
+  try {
+    var sheet = sheetById(ss, restore.target.sheetId);
+    if (!sheet) return;
+    var cell = sheet.getRange(restore.target.row, restore.target.column);
+    if (restore.background && restore.background !== '#ffffff') {
+      cell.setBackground(restore.background);
+    } else {
+      cell.setBackground(null);
+    }
+  } catch (e) {}
+}
+
+/** Standalone restore, for ending a walk without another jump. */
+function scopionClearHighlight(restore) {
+  restoreHighlight(SpreadsheetApp.getActive(), restore);
+  return true;
+}
+
+/**
  * Navigation. action "jump" moves the grid selection only (arrow-key walking);
  * "navigateAndAudit" moves it AND audits the target as the new origin in one
  * round trip (Enter drill-in / Back).
@@ -145,6 +171,25 @@ function scopionNavigate(request) {
   var range = sheet.getRange(row, column);
   ss.setActiveRange(range);
 
+  // Walk highlight: paint the landed-on cell so the eye finds it instantly
+  // (the selection outline alone is easy to lose on a dense model). The
+  // previous walked cell is restored in the same round trip; the client keeps
+  // the single {target, background} record and sends it back on the next hop.
+  var highlight = null;
+  if (request.highlight && request.highlight.apply) {
+    restoreHighlight(ss, request.highlight.restore);
+    try {
+      var prevBackground = range.getBackground();
+      range.setBackground(WALK_HIGHLIGHT);
+      highlight = { background: prevBackground, applied: true };
+    } catch (e) {
+      highlight = { background: null, applied: false }; // protected range
+    }
+  } else if (request.highlight && request.highlight.restore) {
+    restoreHighlight(ss, request.highlight.restore);
+    highlight = { background: null, applied: false };
+  }
+
   var selection = {
     key: sheet.getSheetId() + ':' + row + ':' + column,
     sheetId: sheet.getSheetId(),
@@ -152,7 +197,8 @@ function scopionNavigate(request) {
     row: row,
     column: column,
     a1: range.getA1Notation(),
-    sheetWasUnhidden: unhidden
+    sheetWasUnhidden: unhidden,
+    highlight: highlight
   };
 
   if (request.action === 'navigateAndAudit') {
