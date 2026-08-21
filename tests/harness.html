@@ -1136,6 +1136,21 @@ ValueCache.prototype.getRect = function (r) {
   return out;
 };
 
+/**
+ * Total of the numeric cells in a rectangle. The Excel original showed this
+ * for SUM ranges only; a modeller wants it for every multi-cell reference —
+ * "is this block the size I think it is" is the question a range row is
+ * there to answer.
+ */
+ValueCache.prototype.sumRect = function (r) {
+  var cells = this.getRect(r);
+  var sum = 0, count = 0;
+  for (var i = 0; i < cells.length; i++) {
+    if (typeof cells[i] === 'number') { sum += cells[i]; count++; }
+  }
+  return { sum: sum, count: count };
+};
+
 /** The cached used-range grid for a sheet, or null when it cannot be held. */
 ValueCache.prototype.grid = function (sheetName) {
   var grid = this.sheets[sheetName];
@@ -1334,8 +1349,8 @@ function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, d
 // Precedents / dependents
 // ---------------------------------------------------------------------------
 
-function findPrecedents(ss, sheetName, a1, namedRanges) {
-  var values = new ValueCache(ss);
+function findPrecedents(ss, sheetName, a1, namedRanges, values) {
+  values = values || new ValueCache(ss);
   var sheet = ss.getSheetByName(sheetName);
   var formula = sheet.getRange(a1).getFormula();
   var targets = [];
@@ -1386,8 +1401,8 @@ function findPrecedents(ss, sheetName, a1, namedRanges) {
  * memory. The elapsed time is reported to the UI so the cost is visible rather
  * than assumed — add an index only if these numbers justify one.
  */
-function findDependents(ss, targetSheetName, a1, namedRanges) {
-  var values = new ValueCache(ss);
+function findDependents(ss, targetSheetName, a1, namedRanges, values) {
+  values = values || new ValueCache(ss);
   var target = a1ToRect(a1, targetSheetName);
   var sheets = ss.getSheets();
   var targets = [];
@@ -1774,15 +1789,18 @@ function scopionAuditCore(request) {
   }
 
   var namedRanges = buildNamedRangeMap(ss);
+  // One grid cache for the whole audit: the resolver and the row values used
+  // to read every sheet twice.
+  var values = new ValueCache(ss);
   var originSheet = ss.getSheetByName(sheetName);
   var originCell = originSheet.getRange(a1);
 
   var found, unresolved = [], skipped = [], scanStats = null;
   if (mode === 'precedents') {
-    found = findPrecedents(ss, sheetName, a1, namedRanges);
+    found = findPrecedents(ss, sheetName, a1, namedRanges, values);
     unresolved = found.unresolved;
   } else {
-    var dep = findDependents(ss, sheetName, a1, namedRanges);
+    var dep = findDependents(ss, sheetName, a1, namedRanges, values);
     found = { formula: originCell.getFormula(), targets: dep.targets };
     skipped = dep.skipped;
     scanStats = { elapsedMs: dep.elapsedMs, scannedFormulas: dep.scannedFormulas };
@@ -1802,7 +1820,7 @@ function scopionAuditCore(request) {
     targets = targets.filter(function (t) { return !t.external; });
   }
 
-  var rows = materializeRows(ss, targets, visible);
+  var rows = materializeRows(ss, targets, visible, values);
 
   // Navigation identity for each row (sheetId:row:col of the row's top-left).
   var idBySheet = {};
@@ -1880,7 +1898,7 @@ function namesCovering(namedRanges, sheetName, a1) {
  * box is small enough, otherwise per target — a formula referencing both A1 and
  * ZZ100000 would otherwise pull the whole sheet.
  */
-function materializeRows(ss, targets, visible) {
+function materializeRows(ss, targets, visible, cache) {
   var bySheet = {};
   var rows = [];
 
@@ -1967,7 +1985,7 @@ function materializeRows(ss, targets, visible) {
         sheetName: sheetName,
         flag: visible[sheetName] === false ? 'H' : '',
         address: rectToA1(rct),
-        value: isBlank ? BLANK_LABEL : (isRange ? '(' + rectToA1(rct) + ')' : display),
+        value: isBlank ? BLANK_LABEL : (isRange ? rangeTotal(cache, rct) : display),
         background: background,
         subFormula: item.target.raw || '',
         viaName: item.target.viaName || '',
@@ -1981,6 +1999,22 @@ function materializeRows(ss, targets, visible) {
 
   rows.sort(function (a, b) { return a.index - b.index; });
   return rows;
+}
+
+/** A range row shows what the block adds up to, or an em dash when nothing in
+ *  it is numeric. */
+function rangeTotal(cache, rct) {
+  if (!cache) return '\u2014';
+  var t = cache.sumRect(rct);
+  if (!t.count) return '\u2014';
+  return formatNumber(t.sum) + ' (' + t.count + ')';
+}
+
+function formatNumber(n) {
+  var rounded = Math.round(n * 100) / 100;
+  var parts = String(rounded).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
 }
 
 function missingSheetRow(item, sheetName) {
@@ -2531,11 +2565,11 @@ function renderList(audit) {
     var colour = safeColour(row.background);
     var swatch = (colour === 'transparent' || /^#f{6}$/i.test(colour)) ? '' :
       '<span class="swatch" style="background:' + colour + '" title="cell colour"></span>';
-    var isRangeRow = row.address.indexOf(':') >= 0;
+
     el.innerHTML =
       '<div class="l1">' +
         '<span class="addr">' + esc(row.sheetName + '!' + row.address) + '</span>' + badges +
-        '<span class="val">' + esc(row.isBlank ? '' : (isRangeRow ? '—' : row.value)) + '</span>' +
+        '<span class="val">' + esc(row.isBlank ? '' : row.value) + '</span>' +
         swatch +
       '</div>' +
       '<div class="l2 mono">' + esc(row.sourceFormula || row.subFormula) +

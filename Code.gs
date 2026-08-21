@@ -301,15 +301,18 @@ function scopionAuditCore(request) {
   }
 
   var namedRanges = buildNamedRangeMap(ss);
+  // One grid cache for the whole audit: the resolver and the row values used
+  // to read every sheet twice.
+  var values = new ValueCache(ss);
   var originSheet = ss.getSheetByName(sheetName);
   var originCell = originSheet.getRange(a1);
 
   var found, unresolved = [], skipped = [], scanStats = null;
   if (mode === 'precedents') {
-    found = findPrecedents(ss, sheetName, a1, namedRanges);
+    found = findPrecedents(ss, sheetName, a1, namedRanges, values);
     unresolved = found.unresolved;
   } else {
-    var dep = findDependents(ss, sheetName, a1, namedRanges);
+    var dep = findDependents(ss, sheetName, a1, namedRanges, values);
     found = { formula: originCell.getFormula(), targets: dep.targets };
     skipped = dep.skipped;
     scanStats = { elapsedMs: dep.elapsedMs, scannedFormulas: dep.scannedFormulas };
@@ -329,7 +332,7 @@ function scopionAuditCore(request) {
     targets = targets.filter(function (t) { return !t.external; });
   }
 
-  var rows = materializeRows(ss, targets, visible);
+  var rows = materializeRows(ss, targets, visible, values);
 
   // Navigation identity for each row (sheetId:row:col of the row's top-left).
   var idBySheet = {};
@@ -407,7 +410,7 @@ function namesCovering(namedRanges, sheetName, a1) {
  * box is small enough, otherwise per target — a formula referencing both A1 and
  * ZZ100000 would otherwise pull the whole sheet.
  */
-function materializeRows(ss, targets, visible) {
+function materializeRows(ss, targets, visible, cache) {
   var bySheet = {};
   var rows = [];
 
@@ -494,7 +497,7 @@ function materializeRows(ss, targets, visible) {
         sheetName: sheetName,
         flag: visible[sheetName] === false ? 'H' : '',
         address: rectToA1(rct),
-        value: isBlank ? BLANK_LABEL : (isRange ? '(' + rectToA1(rct) + ')' : display),
+        value: isBlank ? BLANK_LABEL : (isRange ? rangeTotal(cache, rct) : display),
         background: background,
         subFormula: item.target.raw || '',
         viaName: item.target.viaName || '',
@@ -508,6 +511,22 @@ function materializeRows(ss, targets, visible) {
 
   rows.sort(function (a, b) { return a.index - b.index; });
   return rows;
+}
+
+/** A range row shows what the block adds up to, or an em dash when nothing in
+ *  it is numeric. */
+function rangeTotal(cache, rct) {
+  if (!cache) return '\u2014';
+  var t = cache.sumRect(rct);
+  if (!t.count) return '\u2014';
+  return formatNumber(t.sum) + ' (' + t.count + ')';
+}
+
+function formatNumber(n) {
+  var rounded = Math.round(n * 100) / 100;
+  var parts = String(rounded).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
 }
 
 function missingSheetRow(item, sheetName) {

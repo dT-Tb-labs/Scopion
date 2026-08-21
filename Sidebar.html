@@ -638,11 +638,11 @@ function renderList(audit) {
     var colour = safeColour(row.background);
     var swatch = (colour === 'transparent' || /^#f{6}$/i.test(colour)) ? '' :
       '<span class="swatch" style="background:' + colour + '" title="cell colour"></span>';
-    var isRangeRow = row.address.indexOf(':') >= 0;
+
     el.innerHTML =
       '<div class="l1">' +
         '<span class="addr">' + esc(row.sheetName + '!' + row.address) + '</span>' + badges +
-        '<span class="val">' + esc(row.isBlank ? '' : (isRangeRow ? '—' : row.value)) + '</span>' +
+        '<span class="val">' + esc(row.isBlank ? '' : row.value) + '</span>' +
         swatch +
       '</div>' +
       '<div class="l2 mono">' + esc(row.sourceFormula || row.subFormula) +

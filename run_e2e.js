@@ -210,6 +210,16 @@ res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B3', mode: 'dependent
 check('a reader through an OFFSET argument', addrs(res).sort(),
   ['Model!A2', 'Model!A3', 'Model!A6', 'Model!A8'].sort());
 
+console.log('range totals');
+// A range row answers "how big is this block" — the Excel original showed this
+// for SUM only; every multi-cell reference gets it here.
+model.cells[30] = { 1: { formula: '=SUM(Inputs!B1:B3)', value: 0, background: '#ffffff' } };
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A30', mode: 'precedents' });
+const rangeRow = res.rows.filter((r) => r.address.indexOf(':') > 0)[0];
+check('a range row shows its total and how many numbers it holds',
+  rangeRow && rangeRow.value, '101.05 (3)');
+delete model.cells[30];
+
 console.log('lookup idioms');
 // The two shapes almost every financial model is built from.
 const look = sheetOf('Lookup', {

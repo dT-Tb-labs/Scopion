@@ -371,6 +371,21 @@ ValueCache.prototype.getRect = function (r) {
   return out;
 };
 
+/**
+ * Total of the numeric cells in a rectangle. The Excel original showed this
+ * for SUM ranges only; a modeller wants it for every multi-cell reference —
+ * "is this block the size I think it is" is the question a range row is
+ * there to answer.
+ */
+ValueCache.prototype.sumRect = function (r) {
+  var cells = this.getRect(r);
+  var sum = 0, count = 0;
+  for (var i = 0; i < cells.length; i++) {
+    if (typeof cells[i] === 'number') { sum += cells[i]; count++; }
+  }
+  return { sum: sum, count: count };
+};
+
 /** The cached used-range grid for a sheet, or null when it cannot be held. */
 ValueCache.prototype.grid = function (sheetName) {
   var grid = this.sheets[sheetName];
@@ -569,8 +584,8 @@ function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, d
 // Precedents / dependents
 // ---------------------------------------------------------------------------
 
-function findPrecedents(ss, sheetName, a1, namedRanges) {
-  var values = new ValueCache(ss);
+function findPrecedents(ss, sheetName, a1, namedRanges, values) {
+  values = values || new ValueCache(ss);
   var sheet = ss.getSheetByName(sheetName);
   var formula = sheet.getRange(a1).getFormula();
   var targets = [];
@@ -621,8 +636,8 @@ function findPrecedents(ss, sheetName, a1, namedRanges) {
  * memory. The elapsed time is reported to the UI so the cost is visible rather
  * than assumed — add an index only if these numbers justify one.
  */
-function findDependents(ss, targetSheetName, a1, namedRanges) {
-  var values = new ValueCache(ss);
+function findDependents(ss, targetSheetName, a1, namedRanges, values) {
+  values = values || new ValueCache(ss);
   var target = a1ToRect(a1, targetSheetName);
   var sheets = ss.getSheets();
   var targets = [];
