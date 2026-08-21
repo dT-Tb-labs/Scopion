@@ -73,9 +73,16 @@
     display: flex; justify-content: space-between; align-items: center;
     padding: 2px 12px 4px; font-size: 11px; color: var(--muted);
   }
-  .hint { color: var(--blue); cursor: pointer; }
+  .hint {
+    color: var(--blue); cursor: pointer; border: 1px solid var(--blue);
+    background: var(--blue-bg); border-radius: 999px; padding: 1px 8px;
+    font-size: 10px; font-weight: 600; white-space: nowrap;
+  }
+  .hint:hover { background: #d2e3fc; }
 
-  #list { outline: none; margin: 0 8px; border-radius: 8px; }
+  /* min-height keeps the keyboard target big even when the list is short or
+     empty — handing the keyboard over must not require hitting a thin strip. */
+  #list { outline: none; margin: 0 8px; border-radius: 8px; min-height: 120px; }
   #list:focus-visible, #list:focus {
     outline: 2px solid var(--blue); outline-offset: 0;
   }
@@ -150,7 +157,7 @@
 
 <div class="listhead">
   <span id="stats"></span>
-  <span class="hint" id="focusHint" style="display:none">click list → ↑↓ walk</span>
+  <button class="hint" id="focusHint" style="display:none" title="give the keyboard to the reference list">↑↓ で歩く</button>
 </div>
 
 <div id="list" role="listbox" tabindex="0" aria-label="References"></div>
@@ -2174,6 +2181,7 @@ function goBack() {
 // ---------------------------------------------------------------------------
 function acceptAudit(audit, focusList) {
   if (!audit) return;
+  var hadFocus = document.activeElement === $('list');
   S.audit = audit;
   S.rows = audit.rows;
   S.activeIndex = -1;
@@ -2197,7 +2205,10 @@ function acceptAudit(audit, focusList) {
 
   // Focus policy: sidebar-initiated renders keep keyboard control; a
   // follow-poll render must never steal focus from the grid.
-  if (focusList) refocusList();
+  // Keep the keyboard where it already is: an audit triggered from the sidebar
+  // focuses the list, and a follow-triggered one keeps it if the sidebar
+  // already had it (only the grid must never be interrupted).
+  if (focusList || hadFocus) refocusList();
   updateFocusHint();
 }
 
@@ -2339,6 +2350,8 @@ $('list').addEventListener('keydown', function (ev) {
   else if (k === 'Home') { setActive(0, true); }
   else if (k === 'End') { setActive(S.rows.length - 1, true); }
   else if (k === 'Enter' || k === 'ArrowRight') {
+    // Never a silent no-op: with no row selected yet, act on the first one.
+    if (S.activeIndex < 0 && S.rows.length) setActive(0, /*jump=*/false);
     if (S.activeIndex >= 0) activateRow(S.activeIndex);
   }
   else if (k === 'ArrowLeft' || k === 'Backspace') { goBack(); }
@@ -2355,8 +2368,13 @@ $('list').addEventListener('keydown', function (ev) {
 
 window.addEventListener('blur', updateFocusHint);
 window.addEventListener('focus', updateFocusHint);
-$('list').addEventListener('focus', updateFocusHint);
+$('list').addEventListener('focus', function () {
+  if (S.rows.length && S.activeIndex < 0) setActive(0, /*jump=*/false);
+  updateFocusHint();
+});
 $('list').addEventListener('blur', function () { setTimeout(updateFocusHint, 50); });
+$('focusHint').onclick = function () { $('list').focus(); };
+
 function updateFocusHint() {
   var owns = document.activeElement === $('list');
   $('focusHint').style.display = owns || !S.rows.length ? 'none' : '';
