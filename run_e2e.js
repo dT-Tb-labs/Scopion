@@ -277,6 +277,13 @@ sandbox.scopionNavigate({ action: 'jump', target: { sheetId: modId, row: 3, colu
 check('the next hop restores the previous cell', hid.getRange('A1').getBackground(), '#ffe0e0');
 check('and paints the new one', modelSheet.getRange('B3').getBackground(), '#ccff90');
 
+// an orphan from an interrupted walk must not be recorded as the real colour
+hid.getRange('A3').setBackground('#ccff90'); // leftover from a dead session
+sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hidId, row: 3, column: 1 }, highlight: { apply: true } });
+sandbox.scopionClearHighlight();
+check('an orphaned highlight is never restored as the original colour',
+  hid.getRange('A3').getBackground(), '#ffffff');
+
 // the sidebar dies mid-walk: a fresh session must clean up the orphan
 sandbox.scopionObserve({ knownKey: null, mode: 'precedents', firstRun: true });
 check('a new session clears an orphaned highlight', modelSheet.getRange('B3').getBackground(), '#ffffff');

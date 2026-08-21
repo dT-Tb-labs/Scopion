@@ -1540,6 +1540,11 @@ function scopionNavigate(request) {
     restoreHighlight(ss, readHighlightRecord()); // whatever is painted now
     try {
       var prevBackground = range.getBackground();
+      // Never remember our own highlight as the cell's "real" colour. A walk
+      // that was interrupted (sidebar closed, script updated) leaves the paint
+      // behind; without this guard the next walk records green as the original
+      // and faithfully restores green — the cell could never go back.
+      if (prevBackground === WALK_HIGHLIGHT) prevBackground = null;
       range.setBackground(WALK_HIGHLIGHT);
       writeHighlightRecord({
         target: { sheetId: sheet.getSheetId(), row: row, column: column },
