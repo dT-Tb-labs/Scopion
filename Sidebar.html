@@ -86,6 +86,16 @@
   #list:focus-visible, #list:focus {
     outline: 2px solid var(--blue); outline-offset: 0;
   }
+  /* When the grid holds the keyboard, say so on the list itself rather than
+     only in a small pill: a modeller pressing arrows and seeing nothing move
+     needs the reason where they are looking. */
+  #list.unfocused { cursor: pointer; }
+  #list.unfocused::after {
+    content: 'クリックすると ↑↓ で参照先を歩けます';
+    display: block; margin: 6px 6px 0; padding: 5px 8px;
+    background: var(--blue-bg); color: var(--blue);
+    border-radius: 6px; font-size: 11px; text-align: center;
+  }
   #list.blank-alert { background: #fffbe6; border-radius: 6px; }
   .row {
     position: relative; padding: 6px 8px 6px 14px; border-radius: 6px;
@@ -210,7 +220,7 @@ var S = {
 
   // walk highlight: the one cell currently painted, with its original
   // background, so every hop (and the end of the walk) can restore it
-  highlight: null,        // {target:{sheetId,row,column}, background} | null
+  painted: false,         // is a walk cell currently painted?
 
   // jump queue (latest-wins, single flight, never auto-retried)
   desiredTarget: null,
@@ -371,7 +381,7 @@ function pumpJumps() {
       // must not touch any state (it would move the grid BACK to the older
       // target and corrupt the suppression keys).
       if (gen !== S.generation) { scheduleNextPoll(); return; }
-      consumeHighlight(res.selection, target);
+      consumeHighlight(res.selection);
       S.committedTarget = target;
       S.lastSeenKey = res.selection.key;
       S.suppressedKey = res.selection.key;
@@ -395,24 +405,21 @@ function pumpJumps() {
     });
 }
 
+// The server owns the highlight record (DocumentProperties), so the client
+// only says whether this hop should paint.
 function highlightRequest() {
-  return { apply: S.paintWalk !== false, restore: S.highlight };
+  return { apply: S.paintWalk !== false };
 }
 
-function consumeHighlight(selection, target) {
-  if (selection.highlight && selection.highlight.applied) {
-    S.highlight = { target: target, background: selection.highlight.background };
-  } else {
-    S.highlight = null;
-  }
+function consumeHighlight(selection) {
+  S.painted = !!(selection.highlight && selection.highlight.applied);
 }
 
 /** End of a walk: put the painted cell back. Fire-and-forget. */
 function clearHighlight() {
-  if (!S.highlight) return;
-  var restore = S.highlight;
-  S.highlight = null;
-  rpc('scopionClearHighlight', restore).catch(function () {});
+  if (!S.painted) return;
+  S.painted = false;
+  rpc('scopionClearHighlight').catch(function () {});
 }
 
 /**
@@ -424,11 +431,24 @@ function clearHighlight() {
  * one hop (observed live: only one scopionNavigate for three ArrowDowns).
  * Re-asserting across the render window fixes it.
  */
+/**
+ * Take the keyboard.
+ *
+ * Two things must happen: the BROWSER's focused frame has to become this
+ * sidebar iframe (window.focus), and the listbox has to be the focused element
+ * inside it (list.focus). Sheets fights both — the menu click that opened the
+ * sidebar returns focus to the grid, and every server-side activate() plus the
+ * highlight repaint grabs it again after our call lands (measured live: one
+ * scopionNavigate for three ArrowDowns). So re-assert across the whole render
+ * window instead of once.
+ */
 function refocusList() {
   var list = $('list');
-  [0, 120, 320, 650].forEach(function (delay) {
+  [0, 80, 200, 400, 700, 1100].forEach(function (delay) {
     setTimeout(function () {
-      if (document.activeElement !== list) list.focus();
+      if (document.activeElement === list) return;
+      try { window.focus(); } catch (e) {}
+      list.focus();
     }, delay);
   });
 }
@@ -460,7 +480,7 @@ function drill(target, historyOp) {
     .then(function (res) {
       S.navCount--;
       if (gen !== S.generation) { scheduleNextPoll(); return; }
-      consumeHighlight(res.selection, target);
+      consumeHighlight(res.selection);
       if (historyOp === 'push' && outgoing) {
         S.history.push({ target: outgoing, label: outgoingLabel });
       }
@@ -683,11 +703,13 @@ $('list').addEventListener('focus', function () {
   updateFocusHint();
 });
 $('list').addEventListener('blur', function () { setTimeout(updateFocusHint, 50); });
-$('focusHint').onclick = function () { $('list').focus(); };
+$('focusHint').onclick = function () { refocusList(); };
+$('list').addEventListener('mousedown', function () { refocusList(); });
 
 function updateFocusHint() {
   var owns = document.activeElement === $('list');
   $('focusHint').style.display = owns || !S.rows.length ? 'none' : '';
+  $('list').classList.toggle('unfocused', !owns && S.rows.length > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -765,13 +787,16 @@ rpc('scopionGetSettings').then(function (settings) {
   ['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
     if ($(key)) $(key).checked = settings[key];
   });
-  return rpc('scopionObserve', { knownKey: null, mode: S.mode });
+  return rpc('scopionObserve', { knownKey: null, mode: S.mode, firstRun: true });
 }).then(function (res) {
   $('pollLabel').textContent = S.follow ? 'following' : 'paused';
   if (res && res.selection) {
     S.lastSeenKey = res.selection.key;
     if (res.audit) acceptAudit(res.audit, true);
   }
+  // The sidebar was opened by a deliberate user action; claim the keyboard so
+  // the promise "shortcut, then arrows" holds without an extra click.
+  refocusList();
   scheduleNextPoll();
 }).catch(function (e) {
   toastError(e);

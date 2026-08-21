@@ -105,6 +105,9 @@ function selectionInfo(ss) {
  */
 function scopionObserve(request) {
   var ss = SpreadsheetApp.getActive();
+  // A sidebar that was closed mid-walk leaves a painted cell behind. The first
+  // poll of a new session clears it.
+  if (request && request.firstRun) scopionClearHighlight();
   var sel = selectionInfo(ss);
   if (!sel) return { changed: false, selection: null };
   if (request && request.knownKey === sel.key) {
@@ -116,6 +119,29 @@ function scopionObserve(request) {
     mode: request && request.mode
   });
   return { changed: true, selection: sel, audit: audit };
+}
+
+/**
+ * The walk highlight is owned by the DOCUMENT, not the sidebar.
+ *
+ * A sidebar reload (or simply closing and reopening it) used to orphan the
+ * painted cell forever, because only the client remembered what to restore.
+ * Keeping the record in DocumentProperties means any later run — including the
+ * next boot — can clean it up.
+ */
+function readHighlightRecord() {
+  try {
+    var raw = PropertiesService.getDocumentProperties().getProperty('scopion.hl');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function writeHighlightRecord(record) {
+  try {
+    var props = PropertiesService.getDocumentProperties();
+    if (record) props.setProperty('scopion.hl', JSON.stringify(record));
+    else props.deleteProperty('scopion.hl');
+  } catch (e) {}
 }
 
 /**
@@ -138,8 +164,12 @@ function restoreHighlight(ss, restore) {
 }
 
 /** Standalone restore, for ending a walk without another jump. */
-function scopionClearHighlight(restore) {
-  restoreHighlight(SpreadsheetApp.getActive(), restore);
+function scopionClearHighlight() {
+  var record = readHighlightRecord();
+  if (record) {
+    restoreHighlight(SpreadsheetApp.getActive(), record);
+    writeHighlightRecord(null);
+  }
   return true;
 }
 
@@ -177,17 +207,23 @@ function scopionNavigate(request) {
   // the single {target, background} record and sends it back on the next hop.
   var highlight = null;
   if (request.highlight && request.highlight.apply) {
-    restoreHighlight(ss, request.highlight.restore);
+    restoreHighlight(ss, readHighlightRecord()); // whatever is painted now
     try {
       var prevBackground = range.getBackground();
       range.setBackground(WALK_HIGHLIGHT);
-      highlight = { background: prevBackground, applied: true };
+      writeHighlightRecord({
+        target: { sheetId: sheet.getSheetId(), row: row, column: column },
+        background: prevBackground
+      });
+      highlight = { applied: true };
     } catch (e) {
-      highlight = { background: null, applied: false }; // protected range
+      writeHighlightRecord(null);
+      highlight = { applied: false }; // protected range
     }
-  } else if (request.highlight && request.highlight.restore) {
-    restoreHighlight(ss, request.highlight.restore);
-    highlight = { background: null, applied: false };
+  } else if (request.highlight) {
+    restoreHighlight(ss, readHighlightRecord());
+    writeHighlightRecord(null);
+    highlight = { applied: false };
   }
 
   var selection = {

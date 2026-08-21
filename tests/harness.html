@@ -86,6 +86,16 @@
   #list:focus-visible, #list:focus {
     outline: 2px solid var(--blue); outline-offset: 0;
   }
+  /* When the grid holds the keyboard, say so on the list itself rather than
+     only in a small pill: a modeller pressing arrows and seeing nothing move
+     needs the reason where they are looking. */
+  #list.unfocused { cursor: pointer; }
+  #list.unfocused::after {
+    content: 'クリックすると ↑↓ で参照先を歩けます';
+    display: block; margin: 6px 6px 0; padding: 5px 8px;
+    background: var(--blue-bg); color: var(--blue);
+    border-radius: 6px; font-size: 11px; text-align: center;
+  }
   #list.blank-alert { background: #fffbe6; border-radius: 6px; }
   .row {
     position: relative; padding: 6px 8px 6px 14px; border-radius: 6px;
@@ -564,7 +574,8 @@ function extractRefs(formula) {
         a1: stringLiteral(call.args[1]),
         kind: 'external',
         raw: call.args.length ? 'IMPORTRANGE(' + call.args.join(', ') + ')' : 'IMPORTRANGE()',
-        url: stringLiteral(call.args[0])
+        url: stringLiteral(call.args[0]),
+        pos: t.start
       });
       pendingSheet = null;
       continue;
@@ -575,7 +586,8 @@ function extractRefs(formula) {
         sheet: pendingSheet,
         a1: t.value.replace(/\$/g, ''),
         kind: 'ref',
-        raw: (pendingSheet !== null ? pendingSheetRaw + '!' : '') + t.value
+        raw: (pendingSheet !== null ? pendingSheetRaw + '!' : '') + t.value,
+        pos: t.start
       });
       pendingSheet = null;
       continue;
@@ -584,7 +596,7 @@ function extractRefs(formula) {
     if (t.type === TOK.NAME) {
       // A sheet-qualified bare identifier is not a named range; drop the qualifier.
       if (pendingSheet === null && !locals[t.value.toUpperCase()]) {
-        out.push({ sheet: null, a1: t.value, kind: 'name', raw: t.value });
+        out.push({ sheet: null, a1: t.value, kind: 'name', raw: t.value, pos: t.start });
       }
       pendingSheet = null;
       continue;
@@ -1166,7 +1178,7 @@ function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, d
       resolved = null;
       reason = 'index falls outside the range (Sheets returns #REF!)';
     }
-    out.push({ rect: resolved, raw: call.text, reason: reason, dynamic: true });
+    out.push({ rect: resolved, raw: call.text, reason: reason, dynamic: true, pos: call.index });
   }
   return out;
 }
@@ -1187,19 +1199,35 @@ function findPrecedents(ss, sheetName, a1, namedRanges) {
     for (var i = 0; i < refs.length; i++) {
       var ref = refs[i];
       if (ref.kind === 'external') {
-        targets.push({ external: true, url: ref.url, a1: ref.a1, raw: ref.raw });
+        targets.push({ external: true, url: ref.url, a1: ref.a1, raw: ref.raw, pos: ref.pos || 0 });
         continue;
       }
       if (ref.kind === 'name' && !namedRanges[ref.a1.toUpperCase()]) continue; // a function we do not know, not a name
       var r = refToRect(ref, sheetName, namedRanges);
-      if (r) targets.push({ rect: r, raw: ref.raw, viaName: ref.kind === 'name' ? ref.a1 : '' });
+      if (r) targets.push({ rect: r, raw: ref.raw, pos: ref.pos || 0,
+                            viaName: ref.kind === 'name' ? ref.a1 : '' });
     }
 
     var dyn = resolveDynamicTargets(formula, sheetName, values, namedRanges);
     for (var d = 0; d < dyn.length; d++) {
-      if (dyn[d].rect) targets.push({ rect: dyn[d].rect, raw: dyn[d].raw, dynamic: true });
-      else unresolved.push({ raw: dyn[d].raw, reason: dyn[d].reason });
+      if (dyn[d].rect) {
+        targets.push({ rect: dyn[d].rect, raw: dyn[d].raw, dynamic: true, pos: dyn[d].pos || 0 });
+      } else {
+        unresolved.push({ raw: dyn[d].raw, reason: dyn[d].reason });
+      }
     }
+
+    // Reading order. A modeller checks a formula left to right, so the walk
+    // must follow the formula, not the order the resolver happened to produce
+    // (static refs first, dynamic targets appended). A dynamic call sorts at
+    // the position of the call itself, so OFFSET(...)'s resolved target sits
+    // where OFFSET is written, ahead of its own arguments.
+    targets = targets.map(function (t, i) { return { t: t, i: i }; })
+      .sort(function (a, b) {
+        var d = (a.t.pos || 0) - (b.t.pos || 0);
+        return d !== 0 ? d : a.i - b.i;
+      })
+      .map(function (w) { return w.t; });
   }
 
   return { formula: formula, targets: targets, unresolved: unresolved };
@@ -1403,6 +1431,9 @@ function selectionInfo(ss) {
  */
 function scopionObserve(request) {
   var ss = SpreadsheetApp.getActive();
+  // A sidebar that was closed mid-walk leaves a painted cell behind. The first
+  // poll of a new session clears it.
+  if (request && request.firstRun) scopionClearHighlight();
   var sel = selectionInfo(ss);
   if (!sel) return { changed: false, selection: null };
   if (request && request.knownKey === sel.key) {
@@ -1414,6 +1445,29 @@ function scopionObserve(request) {
     mode: request && request.mode
   });
   return { changed: true, selection: sel, audit: audit };
+}
+
+/**
+ * The walk highlight is owned by the DOCUMENT, not the sidebar.
+ *
+ * A sidebar reload (or simply closing and reopening it) used to orphan the
+ * painted cell forever, because only the client remembered what to restore.
+ * Keeping the record in DocumentProperties means any later run — including the
+ * next boot — can clean it up.
+ */
+function readHighlightRecord() {
+  try {
+    var raw = PropertiesService.getDocumentProperties().getProperty('scopion.hl');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function writeHighlightRecord(record) {
+  try {
+    var props = PropertiesService.getDocumentProperties();
+    if (record) props.setProperty('scopion.hl', JSON.stringify(record));
+    else props.deleteProperty('scopion.hl');
+  } catch (e) {}
 }
 
 /**
@@ -1436,8 +1490,12 @@ function restoreHighlight(ss, restore) {
 }
 
 /** Standalone restore, for ending a walk without another jump. */
-function scopionClearHighlight(restore) {
-  restoreHighlight(SpreadsheetApp.getActive(), restore);
+function scopionClearHighlight() {
+  var record = readHighlightRecord();
+  if (record) {
+    restoreHighlight(SpreadsheetApp.getActive(), record);
+    writeHighlightRecord(null);
+  }
   return true;
 }
 
@@ -1475,17 +1533,23 @@ function scopionNavigate(request) {
   // the single {target, background} record and sends it back on the next hop.
   var highlight = null;
   if (request.highlight && request.highlight.apply) {
-    restoreHighlight(ss, request.highlight.restore);
+    restoreHighlight(ss, readHighlightRecord()); // whatever is painted now
     try {
       var prevBackground = range.getBackground();
       range.setBackground(WALK_HIGHLIGHT);
-      highlight = { background: prevBackground, applied: true };
+      writeHighlightRecord({
+        target: { sheetId: sheet.getSheetId(), row: row, column: column },
+        background: prevBackground
+      });
+      highlight = { applied: true };
     } catch (e) {
-      highlight = { background: null, applied: false }; // protected range
+      writeHighlightRecord(null);
+      highlight = { applied: false }; // protected range
     }
-  } else if (request.highlight && request.highlight.restore) {
-    restoreHighlight(ss, request.highlight.restore);
-    highlight = { background: null, applied: false };
+  } else if (request.highlight) {
+    restoreHighlight(ss, readHighlightRecord());
+    writeHighlightRecord(null);
+    highlight = { applied: false };
   }
 
   var selection = {
@@ -1900,7 +1964,7 @@ var S = {
 
   // walk highlight: the one cell currently painted, with its original
   // background, so every hop (and the end of the walk) can restore it
-  highlight: null,        // {target:{sheetId,row,column}, background} | null
+  painted: false,         // is a walk cell currently painted?
 
   // jump queue (latest-wins, single flight, never auto-retried)
   desiredTarget: null,
@@ -2061,7 +2125,7 @@ function pumpJumps() {
       // must not touch any state (it would move the grid BACK to the older
       // target and corrupt the suppression keys).
       if (gen !== S.generation) { scheduleNextPoll(); return; }
-      consumeHighlight(res.selection, target);
+      consumeHighlight(res.selection);
       S.committedTarget = target;
       S.lastSeenKey = res.selection.key;
       S.suppressedKey = res.selection.key;
@@ -2085,24 +2149,21 @@ function pumpJumps() {
     });
 }
 
+// The server owns the highlight record (DocumentProperties), so the client
+// only says whether this hop should paint.
 function highlightRequest() {
-  return { apply: S.paintWalk !== false, restore: S.highlight };
+  return { apply: S.paintWalk !== false };
 }
 
-function consumeHighlight(selection, target) {
-  if (selection.highlight && selection.highlight.applied) {
-    S.highlight = { target: target, background: selection.highlight.background };
-  } else {
-    S.highlight = null;
-  }
+function consumeHighlight(selection) {
+  S.painted = !!(selection.highlight && selection.highlight.applied);
 }
 
 /** End of a walk: put the painted cell back. Fire-and-forget. */
 function clearHighlight() {
-  if (!S.highlight) return;
-  var restore = S.highlight;
-  S.highlight = null;
-  rpc('scopionClearHighlight', restore).catch(function () {});
+  if (!S.painted) return;
+  S.painted = false;
+  rpc('scopionClearHighlight').catch(function () {});
 }
 
 /**
@@ -2114,11 +2175,24 @@ function clearHighlight() {
  * one hop (observed live: only one scopionNavigate for three ArrowDowns).
  * Re-asserting across the render window fixes it.
  */
+/**
+ * Take the keyboard.
+ *
+ * Two things must happen: the BROWSER's focused frame has to become this
+ * sidebar iframe (window.focus), and the listbox has to be the focused element
+ * inside it (list.focus). Sheets fights both — the menu click that opened the
+ * sidebar returns focus to the grid, and every server-side activate() plus the
+ * highlight repaint grabs it again after our call lands (measured live: one
+ * scopionNavigate for three ArrowDowns). So re-assert across the whole render
+ * window instead of once.
+ */
 function refocusList() {
   var list = $('list');
-  [0, 120, 320, 650].forEach(function (delay) {
+  [0, 80, 200, 400, 700, 1100].forEach(function (delay) {
     setTimeout(function () {
-      if (document.activeElement !== list) list.focus();
+      if (document.activeElement === list) return;
+      try { window.focus(); } catch (e) {}
+      list.focus();
     }, delay);
   });
 }
@@ -2150,7 +2224,7 @@ function drill(target, historyOp) {
     .then(function (res) {
       S.navCount--;
       if (gen !== S.generation) { scheduleNextPoll(); return; }
-      consumeHighlight(res.selection, target);
+      consumeHighlight(res.selection);
       if (historyOp === 'push' && outgoing) {
         S.history.push({ target: outgoing, label: outgoingLabel });
       }
@@ -2373,11 +2447,13 @@ $('list').addEventListener('focus', function () {
   updateFocusHint();
 });
 $('list').addEventListener('blur', function () { setTimeout(updateFocusHint, 50); });
-$('focusHint').onclick = function () { $('list').focus(); };
+$('focusHint').onclick = function () { refocusList(); };
+$('list').addEventListener('mousedown', function () { refocusList(); });
 
 function updateFocusHint() {
   var owns = document.activeElement === $('list');
   $('focusHint').style.display = owns || !S.rows.length ? 'none' : '';
+  $('list').classList.toggle('unfocused', !owns && S.rows.length > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -2455,13 +2531,16 @@ rpc('scopionGetSettings').then(function (settings) {
   ['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
     if ($(key)) $(key).checked = settings[key];
   });
-  return rpc('scopionObserve', { knownKey: null, mode: S.mode });
+  return rpc('scopionObserve', { knownKey: null, mode: S.mode, firstRun: true });
 }).then(function (res) {
   $('pollLabel').textContent = S.follow ? 'following' : 'paused';
   if (res && res.selection) {
     S.lastSeenKey = res.selection.key;
     if (res.audit) acceptAudit(res.audit, true);
   }
+  // The sidebar was opened by a deliberate user action; claim the keyboard so
+  // the promise "shortcut, then arrows" holds without an extra click.
+  refocusList();
   scheduleNextPoll();
 }).catch(function (e) {
   toastError(e);

@@ -240,7 +240,8 @@ function extractRefs(formula) {
         a1: stringLiteral(call.args[1]),
         kind: 'external',
         raw: call.args.length ? 'IMPORTRANGE(' + call.args.join(', ') + ')' : 'IMPORTRANGE()',
-        url: stringLiteral(call.args[0])
+        url: stringLiteral(call.args[0]),
+        pos: t.start
       });
       pendingSheet = null;
       continue;
@@ -251,7 +252,8 @@ function extractRefs(formula) {
         sheet: pendingSheet,
         a1: t.value.replace(/\$/g, ''),
         kind: 'ref',
-        raw: (pendingSheet !== null ? pendingSheetRaw + '!' : '') + t.value
+        raw: (pendingSheet !== null ? pendingSheetRaw + '!' : '') + t.value,
+        pos: t.start
       });
       pendingSheet = null;
       continue;
@@ -260,7 +262,7 @@ function extractRefs(formula) {
     if (t.type === TOK.NAME) {
       // A sheet-qualified bare identifier is not a named range; drop the qualifier.
       if (pendingSheet === null && !locals[t.value.toUpperCase()]) {
-        out.push({ sheet: null, a1: t.value, kind: 'name', raw: t.value });
+        out.push({ sheet: null, a1: t.value, kind: 'name', raw: t.value, pos: t.start });
       }
       pendingSheet = null;
       continue;

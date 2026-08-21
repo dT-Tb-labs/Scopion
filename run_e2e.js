@@ -170,14 +170,16 @@ check('plain cross-sheet refs', addrs(res), ['Inputs!B2', 'Inputs!B1']);
 check('no blank alert', res.hasBlank, false);
 
 res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A2', mode: 'precedents' });
-check('OFFSET into a hidden sheet resolves', addrs(res),
-  ["Hidden Calc!A1", 'Inputs!B3', "Hidden Calc!A2"]);
-check('the hidden sheet is flagged H', res.rows.filter((r) => r.flag === 'H').map((r) => r.address), ['A1', 'A2']);
+// Reading order: the OFFSET call sits at position 0, so its resolved target
+// leads, followed by the refs written inside the call.
+check('OFFSET into a hidden sheet resolves, in formula order', addrs(res),
+  ["Hidden Calc!A2", "Hidden Calc!A1", 'Inputs!B3']);
+check('the hidden sheet is flagged H', res.rows.filter((r) => r.flag === 'H').map((r) => r.address), ['A2', 'A1']);
 
 res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A3', mode: 'precedents' });
-check('INDEX target', addrs(res), ['Inputs!B1:B4', 'Inputs!B4']);
+check('INDEX target leads its own range', addrs(res), ['Inputs!B4', 'Inputs!B1:B4']);
 check('an empty INDEX target raises the blank alert', res.hasBlank, true);
-check('and is labelled', res.rows[1].value, '---BLANK CELL---');
+check('and is labelled', res.rows[0].value, '---BLANK CELL---');
 
 res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A5', mode: 'precedents' });
 check('INDIRECT with a literal', addrs(res), ['Inputs!B2']);
@@ -191,7 +193,7 @@ check('with the offending text', res.unresolved[0].raw, 'OFFSET(Inputs!B1,MATCH(
 
 res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A8', mode: 'precedents' });
 check('a named range used as an OFFSET argument resolves', addrs(res),
-  ["Hidden Calc!A1", 'Inputs!B3', "Hidden Calc!A2"]);
+  ["Hidden Calc!A2", "Hidden Calc!A1", 'Inputs!B3']);
 check('and is not reported as unresolvable', res.unresolved.length, 0);
 
 console.log('named ranges');
@@ -207,6 +209,12 @@ check('a same-sheet reader', addrs(res), ['Model!A4']);
 res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B3', mode: 'dependents' });
 check('a reader through an OFFSET argument', addrs(res).sort(),
   ['Model!A2', 'Model!A3', 'Model!A6', 'Model!A8'].sort());
+
+console.log('reading order');
+model.cells[9] = { 1: { formula: '=Inputs!B2+Inputs!B1+Inputs!B3', value: 0, background: '#ffffff' } };
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A9', mode: 'precedents' });
+check('plain refs walk in written order', addrs(res), ['Inputs!B2', 'Inputs!B1', 'Inputs!B3']);
+delete model.cells[9];
 
 console.log('settings');
 sandbox.scopionSetSetting('traverseHidden', false);
@@ -260,17 +268,18 @@ const rehidden = sandbox.scopionRehide(['Hidden Calc'], { sheetId: modelSheet.ge
 check('re-hide hops to the origin and actually hides', rehidden, ['Hidden Calc']);
 check('the selection is back at the origin', ss.getActiveRange().getA1Notation(), 'B7');
 
-console.log('walk highlight');
+console.log('walk highlight (document-owned)');
 const hidId = hid.getSheetId(), modId = modelSheet.getSheetId();
 hid.getRange('A1').setBackground('#ffe0e0'); // pre-existing user colour
-const h1 = sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hidId, row: 1, column: 1 }, highlight: { apply: true, restore: null } });
+sandbox.scopionNavigate({ action: 'jump', target: { sheetId: hidId, row: 1, column: 1 }, highlight: { apply: true } });
 check('the landed cell is painted', hid.getRange('A1').getBackground(), '#ccff90');
-check('and its original colour is returned', h1.selection.highlight.background, '#ffe0e0');
-const h2 = sandbox.scopionNavigate({ action: 'jump', target: { sheetId: modId, row: 3, column: 2 }, highlight: { apply: true, restore: { target: { sheetId: hidId, row: 1, column: 1 }, background: h1.selection.highlight.background } } });
+sandbox.scopionNavigate({ action: 'jump', target: { sheetId: modId, row: 3, column: 2 }, highlight: { apply: true } });
 check('the next hop restores the previous cell', hid.getRange('A1').getBackground(), '#ffe0e0');
 check('and paints the new one', modelSheet.getRange('B3').getBackground(), '#ccff90');
-sandbox.scopionClearHighlight({ target: { sheetId: modId, row: 3, column: 2 }, background: h2.selection.highlight.background });
-check('clearing restores a plain cell to white', modelSheet.getRange('B3').getBackground(), '#ffffff');
+
+// the sidebar dies mid-walk: a fresh session must clean up the orphan
+sandbox.scopionObserve({ knownKey: null, mode: 'precedents', firstRun: true });
+check('a new session clears an orphaned highlight', modelSheet.getRange('B3').getBackground(), '#ffffff');
 sandbox.scopionRehide(['Hidden Calc'], { sheetId: modId, row: 7, column: 2 });
 
 console.log('grid bounds');

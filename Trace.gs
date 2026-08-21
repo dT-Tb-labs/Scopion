@@ -443,7 +443,7 @@ function resolveDynamicTargets(formula, contextSheetName, values, namedRanges, d
       resolved = null;
       reason = 'index falls outside the range (Sheets returns #REF!)';
     }
-    out.push({ rect: resolved, raw: call.text, reason: reason, dynamic: true });
+    out.push({ rect: resolved, raw: call.text, reason: reason, dynamic: true, pos: call.index });
   }
   return out;
 }
@@ -464,19 +464,35 @@ function findPrecedents(ss, sheetName, a1, namedRanges) {
     for (var i = 0; i < refs.length; i++) {
       var ref = refs[i];
       if (ref.kind === 'external') {
-        targets.push({ external: true, url: ref.url, a1: ref.a1, raw: ref.raw });
+        targets.push({ external: true, url: ref.url, a1: ref.a1, raw: ref.raw, pos: ref.pos || 0 });
         continue;
       }
       if (ref.kind === 'name' && !namedRanges[ref.a1.toUpperCase()]) continue; // a function we do not know, not a name
       var r = refToRect(ref, sheetName, namedRanges);
-      if (r) targets.push({ rect: r, raw: ref.raw, viaName: ref.kind === 'name' ? ref.a1 : '' });
+      if (r) targets.push({ rect: r, raw: ref.raw, pos: ref.pos || 0,
+                            viaName: ref.kind === 'name' ? ref.a1 : '' });
     }
 
     var dyn = resolveDynamicTargets(formula, sheetName, values, namedRanges);
     for (var d = 0; d < dyn.length; d++) {
-      if (dyn[d].rect) targets.push({ rect: dyn[d].rect, raw: dyn[d].raw, dynamic: true });
-      else unresolved.push({ raw: dyn[d].raw, reason: dyn[d].reason });
+      if (dyn[d].rect) {
+        targets.push({ rect: dyn[d].rect, raw: dyn[d].raw, dynamic: true, pos: dyn[d].pos || 0 });
+      } else {
+        unresolved.push({ raw: dyn[d].raw, reason: dyn[d].reason });
+      }
     }
+
+    // Reading order. A modeller checks a formula left to right, so the walk
+    // must follow the formula, not the order the resolver happened to produce
+    // (static refs first, dynamic targets appended). A dynamic call sorts at
+    // the position of the call itself, so OFFSET(...)'s resolved target sits
+    // where OFFSET is written, ahead of its own arguments.
+    targets = targets.map(function (t, i) { return { t: t, i: i }; })
+      .sort(function (a, b) {
+        var d = (a.t.pos || 0) - (b.t.pos || 0);
+        return d !== 0 ? d : a.i - b.i;
+      })
+      .map(function (w) { return w.t; });
   }
 
   return { formula: formula, targets: targets, unresolved: unresolved };
