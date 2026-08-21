@@ -49,10 +49,12 @@ class Range {
     return out;
   }
   getFormulas() { return this._grid((c) => c.formula); }
-  getValues() { return this._grid((c) => c.value); }
+  getValues() { CELLS_READ.n += this.nr * this.nc; return this._grid((c) => c.value); }
   getDisplayValues() { return this._grid((c) => (c.value === '' || c.value === null ? '' : String(c.value))); }
   getBackgrounds() { return this._grid((c) => c.background); }
 }
+
+const CELLS_READ = { n: 0 };
 
 class Sheet {
   constructor(name, cells, hidden) {
@@ -239,6 +241,23 @@ const bigRow = res.rows.filter((r) => r.address.indexOf(':') > 0)[0];
 check('an oversized range reports its cell count, not a total',
   bigRow && bigRow.value, '(13,000 cells)');
 delete model.cells[31];
+
+// The Excel original asked for the referenced range and nothing else. A MATCH
+// down one column must not drag the other columns of a wide sheet with it.
+const wide = sheetOf('Wide', {});
+for (let r = 1; r <= 40; r++) {
+  wide.cells[r] = {};
+  for (let c = 1; c <= 30; c++) wide.cells[r][c] = { formula: '', value: r * c, background: '#ffffff' };
+}
+wide.cells[7][1] = { formula: '', value: 'KEY', background: '#ffffff' };
+wide.parent = ss; ss.sheets.push(wide);
+model.cells[32] = { 1: { formula: '=INDEX(Wide!B1:B40,MATCH("KEY",Wide!A1:A40,0))', value: 14, background: '#ffffff' } };
+CELLS_READ.n = 0;
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A32', mode: 'precedents' });
+check('the lookup still lands on the right cell', addrs(res).indexOf('Wide!B7') >= 0, true);
+check('and reads a column, not the whole 40x30 sheet', CELLS_READ.n < 200, true);
+delete model.cells[32];
+ss.sheets.pop();
 
 check('huge totals switch to exponent notation',
   sandbox.formatNumber(2.8726055584439947e141), '2.87e+141');

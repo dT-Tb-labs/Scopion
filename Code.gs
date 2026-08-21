@@ -460,7 +460,12 @@ function materializeRows(ss, targets, visible, cache) {
     var maxRow = Math.max(sheet.getLastRow(), 1);
     var maxCol = Math.max(sheet.getLastColumn(), 1);
     var box = boundingBox(items, maxRow, maxCol);
-    var useBatch = box && (box.r2 - box.r1 + 1) * (box.c2 - box.c1 + 1) <= MAX_MATERIALIZE_BBOX;
+    // The Excel original read one cell per result row and never a block. A
+    // batch only pays when the targets sit close together: six refs scattered
+    // down a model sheet turn "one batch read" into three whole-sheet reads.
+    var boxCells = box ? (box.r2 - box.r1 + 1) * (box.c2 - box.c1 + 1) : 0;
+    var useBatch = box && boxCells <= MAX_MATERIALIZE_BBOX &&
+      boxCells <= items.length * MAX_BATCH_CELLS_PER_TARGET;
 
     var values = null, backgrounds = null, formulas = null;
     if (useBatch) {

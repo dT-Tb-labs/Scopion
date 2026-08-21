@@ -7,6 +7,7 @@
  */
 
 var MAX_MATERIALIZE_BBOX = 200000; // cells; above this, read targets one by one
+var MAX_BATCH_CELLS_PER_TARGET = 64; // a batch must stay dense, not just small
 var SCAN_DEADLINE_MS = 240000;     // stop scanning well inside the 6-minute cap
 
 var MAX_GRID_CACHE_CELLS = 200000;  // above this, read single cells instead of the whole grid
@@ -355,18 +356,67 @@ function ValueCache(ss) {
   this.ss = ss;
   this.sheets = {};
   this.singles = {};
+  this.rects = {};
+  this.reads = {};
 }
 
-/** Values of a rectangle, from the same cached grid. [] when unavailable. */
-ValueCache.prototype.getRect = function (r) {
-  if (!r) return [];
-  var grid = this.grid(r.sheetName);
-  if (!grid || !grid.length) return [];
+/**
+ * A MATCH over one column does not need the other forty. The Excel original
+ * never read a block at all — it asked for the referenced range and nothing
+ * else — so the first few reads of a sheet fetch only the rectangle asked for.
+ * A dependents scan hits the same sheet over and over, and there the whole
+ * grid is cheaper than the round trips, so past this many reads it switches.
+ */
+var RECT_READS_BEFORE_GRID = 8;
+
+function sliceGrid(grid, r) {
   var out = [];
   var lastRow = Math.min(r.r2, grid.length);
-  var lastCol = Math.min(r.c2, grid[0].length);
+  var lastCol = Math.min(r.c2, grid.length ? grid[0].length : 0);
   for (var row = r.r1; row <= lastRow; row++) {
-    for (var col = r.c1; col <= lastCol; col++) out.push(grid[row - 1][col - 1]);
+    var line = [];
+    for (var col = r.c1; col <= lastCol; col++) line.push(grid[row - 1][col - 1]);
+    out.push(line);
+  }
+  return out;
+}
+
+/** Rows of values covering `r`, clamped to the used range. [] when unavailable. */
+ValueCache.prototype.read = function (r) {
+  if (!r) return [];
+  var name = r.sheetName;
+  var grid = this.sheets[name];
+  if (grid === null) return [];
+  if (grid && grid !== true) return sliceGrid(grid, r);
+
+  var key = name + '!' + r.r1 + ',' + r.c1 + ',' + r.r2 + ',' + r.c2;
+  if (key in this.rects) return this.rects[key];
+
+  var sheet = this.ss.getSheetByName(name);
+  if (!sheet || sheet.getLastRow() === 0) { this.sheets[name] = null; return []; }
+
+  this.reads[name] = (this.reads[name] || 0) + 1;
+  var sheetCells = sheet.getLastRow() * sheet.getLastColumn();
+  if (grid === undefined && this.reads[name] > RECT_READS_BEFORE_GRID &&
+      sheetCells <= MAX_GRID_CACHE_CELLS) {
+    this.sheets[name] = sheet.getDataRange().getValues();
+    return sliceGrid(this.sheets[name], r);
+  }
+
+  var lastRow = Math.min(r.r2, sheet.getLastRow());
+  var lastCol = Math.min(r.c2, sheet.getLastColumn());
+  var out = (r.r1 > lastRow || r.c1 > lastCol) ? [] :
+    sheet.getRange(r.r1, r.c1, lastRow - r.r1 + 1, lastCol - r.c1 + 1).getValues();
+  this.rects[key] = out;
+  return out;
+};
+
+/** Values of a rectangle, flattened. [] when unavailable. */
+ValueCache.prototype.getRect = function (r) {
+  var rows = this.read(r);
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    for (var j = 0; j < rows[i].length; j++) out.push(rows[i][j]);
   }
   return out;
 };
@@ -402,31 +452,8 @@ ValueCache.prototype.grid = function (sheetName) {
 ValueCache.prototype.get = function (sheetName, a1) {
   var r = a1ToRect(a1, sheetName);
   if (!r) return null;
-
-  var grid = this.sheets[sheetName];
-  if (grid === undefined) {
-    var sheet = this.ss.getSheetByName(sheetName);
-    if (!sheet || sheet.getLastRow() === 0) {
-      grid = null;
-    } else if (sheet.getLastRow() * sheet.getLastColumn() > MAX_GRID_CACHE_CELLS) {
-      grid = false;
-    } else {
-      grid = sheet.getDataRange().getValues();
-    }
-    this.sheets[sheetName] = grid;
-  }
-
-  if (grid === false) {
-    var key = sheetName + '!' + a1;
-    if (!(key in this.singles)) {
-      var sh = this.ss.getSheetByName(sheetName);
-      this.singles[key] = sh ? sh.getRange(r.r1, r.c1).getValue() : null;
-    }
-    return this.singles[key];
-  }
-  if (!grid) return null;
-  if (grid.length === 0 || r.r1 > grid.length || r.c1 > grid[0].length) return null;
-  return grid[r.r1 - 1][r.c1 - 1];
+  var rows = this.read({ sheetName: sheetName, r1: r.r1, c1: r.c1, r2: r.r1, c2: r.c1 });
+  return (rows.length && rows[0].length) ? rows[0][0] : null;
 };
 
 /** Evaluate an argument to a reference string, for INDIRECT. */
