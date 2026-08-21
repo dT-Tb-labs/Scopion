@@ -604,7 +604,7 @@ function renderWarnings(audit) {
     html += '</ul></div>';
   }
   if (audit.skippedSheets && audit.skippedSheets.length) {
-    html += '<div class="warn amber"><b>Not scanned:</b> ' +
+    html += '<div class="warn amber"><b>Not shown:</b> ' +
       esc(audit.skippedSheets.join(', ')) + '</div>';
   }
   $('warnings').innerHTML = html;

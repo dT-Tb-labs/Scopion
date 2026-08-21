@@ -14,6 +14,16 @@ var SETTING_KEYS = ['showExternal', 'traverseHidden', 'showNamedRanges', 'follow
 var BLANK_LABEL = '---BLANK CELL---';
 var WALK_HIGHLIGHT = '#ccff90'; // the Excel original painted the walked cell ColorIndex 4
 
+// A block this size is a whole model section, not a figure a modeller checks.
+// Summing it costs a full-sheet read and prints a number nobody can read, so
+// the row states its size instead.
+var MAX_TOTAL_CELLS = 5000;
+
+// A whole-sheet dependents scan can return thousands of hits. Past this many
+// the list stops being something a person walks, so the rest is reported as a
+// count rather than shipped to the sidebar.
+var MAX_DEPENDENT_ROWS = 200;
+
 function onOpen() {
   // AuthMode.NONE-safe: menu construction only, no spreadsheet reads.
   SpreadsheetApp.getUi()
@@ -332,6 +342,15 @@ function scopionAuditCore(request) {
     targets = targets.filter(function (t) { return !t.external; });
   }
 
+  // Cap after filtering, so the reported remainder is what the user would
+  // actually have seen. Truncating in silence would read as "that is all of
+  // them", which is the one thing a dependents list must never imply.
+  if (mode !== 'precedents' && targets.length > MAX_DEPENDENT_ROWS) {
+    skipped.push((targets.length - MAX_DEPENDENT_ROWS) + ' more dependents (showing first ' +
+      MAX_DEPENDENT_ROWS + ')');
+    targets = targets.slice(0, MAX_DEPENDENT_ROWS);
+  }
+
   var rows = materializeRows(ss, targets, visible, values);
 
   // Navigation identity for each row (sheetId:row:col of the row's top-left).
@@ -517,12 +536,18 @@ function materializeRows(ss, targets, visible, cache) {
  *  it is numeric. */
 function rangeTotal(cache, rct) {
   if (!cache) return '\u2014';
+  var cells = (rct.r2 - rct.r1 + 1) * (rct.c2 - rct.c1 + 1);
+  if (cells > MAX_TOTAL_CELLS) return '(' + formatNumber(cells) + ' cells)';
   var t = cache.sumRect(rct);
   if (!t.count) return '\u2014';
   return formatNumber(t.sum) + ' (' + t.count + ')';
 }
 
 function formatNumber(n) {
+  if (typeof n !== 'number' || !isFinite(n)) return String(n);
+  // Grouped digits stop being readable long before JavaScript switches to
+  // exponent notation on its own, so the cutover happens here instead.
+  if (n !== 0 && (Math.abs(n) >= 1e15 || Math.abs(n) < 1e-4)) return n.toExponential(2);
   var rounded = Math.round(n * 100) / 100;
   var parts = String(rounded).split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');

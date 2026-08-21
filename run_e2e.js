@@ -210,6 +210,17 @@ res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B3', mode: 'dependent
 check('a reader through an OFFSET argument', addrs(res).sort(),
   ['Model!A2', 'Model!A3', 'Model!A6', 'Model!A8'].sort());
 
+// A whole-sheet scan on a real model returns thousands of hits. The list is
+// capped, and the remainder is stated rather than dropped in silence.
+const many = sheetOf('Many', {});
+for (let r = 1; r <= 250; r++) many.cells[r] = { 1: { formula: '=Inputs!B2', value: 1, background: '#ffffff' } };
+many.parent = ss; ss.sheets.push(many);
+res = sandbox.scopionAuditCore({ sheetName: 'Inputs', a1: 'B2', mode: 'dependents' });
+check('the dependents list is capped', res.rows.length, 200);
+check('and says how many it held back',
+  res.skippedSheets.filter((s) => s.indexOf('more dependents') > 0), ['54 more dependents (showing first 200)']);
+ss.sheets.pop();
+
 console.log('range totals');
 // A range row answers "how big is this block" — the Excel original showed this
 // for SUM only; every multi-cell reference gets it here.
@@ -219,6 +230,22 @@ const rangeRow = res.rows.filter((r) => r.address.indexOf(':') > 0)[0];
 check('a range row shows its total and how many numbers it holds',
   rangeRow && rangeRow.value, '101.05 (3)');
 delete model.cells[30];
+
+// Past MAX_TOTAL_CELLS the sum is neither readable nor worth a whole-sheet
+// read, so the row reports the block's size instead.
+model.cells[31] = { 1: { formula: '=SUM(Inputs!A1:Z500)', value: 0, background: '#ffffff' } };
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A31', mode: 'precedents' });
+const bigRow = res.rows.filter((r) => r.address.indexOf(':') > 0)[0];
+check('an oversized range reports its cell count, not a total',
+  bigRow && bigRow.value, '(13,000 cells)');
+delete model.cells[31];
+
+check('huge totals switch to exponent notation',
+  sandbox.formatNumber(2.8726055584439947e141), '2.87e+141');
+check('tiny totals switch to exponent notation',
+  sandbox.formatNumber(0.00001), '1.00e-5');
+check('ordinary totals keep grouped digits',
+  sandbox.formatNumber(-1234567.891), '-1,234,567.89');
 
 console.log('lookup idioms');
 // The two shapes almost every financial model is built from.
