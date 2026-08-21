@@ -55,6 +55,9 @@ class Range {
 }
 
 const CELLS_READ = { n: 0 };
+// Round trips, not bytes, are what an audit spends its time on in Apps Script.
+const API_CALLS = { n: 0 };
+const counted = (fn) => function (...a) { API_CALLS.n++; return fn.apply(this, a); };
 
 class Sheet {
   constructor(name, cells, hidden) {
@@ -67,15 +70,17 @@ class Sheet {
   isSheetHidden() { return this.hidden; }
   showSheet() { this.hidden = false; } hideSheet() { this.hidden = true; }
   activate() { this.parent.active = this; }
-  getLastRow() { return Math.max(0, ...Object.keys(this.cells).map(Number)); }
-  getMaxRows() { return this.maxRows || 1000; }      // a new Google sheet is 1000 x 26
-  getMaxColumns() { return this.maxCols || 26; }
-  getLastColumn() {
+  _lastRow() { return Math.max(0, ...Object.keys(this.cells).map(Number)); }
+  getLastRow() { API_CALLS.n++; return this._lastRow(); }
+  getMaxRows() { API_CALLS.n++; return this.maxRows || 1000; }   // a new Google sheet is 1000 x 26
+  getMaxColumns() { API_CALLS.n++; return this.maxCols || 26; }
+  _lastCol() {
     let max = 0;
     for (const r of Object.keys(this.cells)) max = Math.max(max, ...Object.keys(this.cells[r]).map(Number));
     return max;
   }
-  getDataRange() { return new Range(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); }
+  getLastColumn() { API_CALLS.n++; return this._lastCol(); }
+  getDataRange() { API_CALLS.n++; return new Range(this, 1, 1, Math.max(this._lastRow(), 1), Math.max(this._lastCol(), 1)); }
   getRange(a, b, c, d) {
     if (typeof a === 'string') { const p = parseA1(a); return new Range(this, p.r1, p.c1, p.r2 - p.r1 + 1, p.c2 - p.c1 + 1); }
     return new Range(this, a, b, c || 1, d || 1);
@@ -252,10 +257,14 @@ for (let r = 1; r <= 40; r++) {
 wide.cells[7][1] = { formula: '', value: 'KEY', background: '#ffffff' };
 wide.parent = ss; ss.sheets.push(wide);
 model.cells[32] = { 1: { formula: '=INDEX(Wide!B1:B40,MATCH("KEY",Wide!A1:A40,0))', value: 14, background: '#ffffff' } };
-CELLS_READ.n = 0;
+CELLS_READ.n = 0; API_CALLS.n = 0;
 res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'A32', mode: 'precedents' });
 check('the lookup still lands on the right cell', addrs(res).indexOf('Wide!B7') >= 0, true);
 check('and reads a column, not the whole 40x30 sheet', CELLS_READ.n < 200, true);
+// Measured on a real 51,600-formula model: latency tracks round trips, not
+// bytes. Fetching a sheet's extent once instead of per read took one audit
+// from 52 calls to 24; this budget is what stops that creeping back.
+check('and does not pay for the same sheet extent twice', API_CALLS.n <= 12, true);
 delete model.cells[32];
 ss.sheets.pop();
 

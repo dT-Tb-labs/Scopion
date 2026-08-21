@@ -358,7 +358,28 @@ function ValueCache(ss) {
   this.singles = {};
   this.rects = {};
   this.reads = {};
+  this.dimensions = {};
 }
+
+/**
+ * getLastRow and friends are server round trips, not properties, and the round
+ * trips are what an audit actually spends its time on: measured on a
+ * 51,600-formula model, one audit made 52 calls to fetch 1,242 cells. A sheet's
+ * extent cannot change mid-audit, so it is fetched once.
+ */
+ValueCache.prototype.dims = function (sheet) {
+  var name = sheet.getName();
+  var d = this.dimensions[name];
+  if (!d) {
+    d = this.dimensions[name] = {
+      lastRow: sheet.getLastRow(),
+      lastCol: sheet.getLastColumn(),
+      maxRows: sheet.getMaxRows(),
+      maxCols: sheet.getMaxColumns()
+    };
+  }
+  return d;
+};
 
 /**
  * A MATCH over one column does not need the other forty. The Excel original
@@ -393,18 +414,19 @@ ValueCache.prototype.read = function (r) {
   if (key in this.rects) return this.rects[key];
 
   var sheet = this.ss.getSheetByName(name);
-  if (!sheet || sheet.getLastRow() === 0) { this.sheets[name] = null; return []; }
+  if (!sheet) { this.sheets[name] = null; return []; }
+  var d = this.dims(sheet);
+  if (d.lastRow === 0) { this.sheets[name] = null; return []; }
 
   this.reads[name] = (this.reads[name] || 0) + 1;
-  var sheetCells = sheet.getLastRow() * sheet.getLastColumn();
   if (grid === undefined && this.reads[name] > RECT_READS_BEFORE_GRID &&
-      sheetCells <= MAX_GRID_CACHE_CELLS) {
+      d.lastRow * d.lastCol <= MAX_GRID_CACHE_CELLS) {
     this.sheets[name] = sheet.getDataRange().getValues();
     return sliceGrid(this.sheets[name], r);
   }
 
-  var lastRow = Math.min(r.r2, sheet.getLastRow());
-  var lastCol = Math.min(r.c2, sheet.getLastColumn());
+  var lastRow = Math.min(r.r2, d.lastRow);
+  var lastCol = Math.min(r.c2, d.lastCol);
   var out = (r.r1 > lastRow || r.c1 > lastCol) ? [] :
     sheet.getRange(r.r1, r.c1, lastRow - r.r1 + 1, lastCol - r.c1 + 1).getValues();
   this.rects[key] = out;

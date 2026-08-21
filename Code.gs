@@ -457,8 +457,11 @@ function materializeRows(ss, targets, visible, cache) {
       continue;
     }
 
-    var maxRow = Math.max(sheet.getLastRow(), 1);
-    var maxCol = Math.max(sheet.getLastColumn(), 1);
+    var dim = cache ? cache.dims(sheet) :
+      { lastRow: sheet.getLastRow(), lastCol: sheet.getLastColumn(),
+        maxRows: sheet.getMaxRows(), maxCols: sheet.getMaxColumns() };
+    var maxRow = Math.max(dim.lastRow, 1);
+    var maxCol = Math.max(dim.lastCol, 1);
     var box = boundingBox(items, maxRow, maxCol);
     // The Excel original read one cell per result row and never a block. A
     // batch only pays when the targets sit close together: six refs scattered
@@ -482,7 +485,7 @@ function materializeRows(ss, targets, visible, cache) {
 
       // Beyond the used range there is nothing to read. Clamping to the last
       // used cell would show a different cell's value under the right address.
-      var withinGrid = rct.r1 <= sheet.getMaxRows() && rct.c1 <= sheet.getMaxColumns();
+      var withinGrid = rct.r1 <= dim.maxRows && rct.c1 <= dim.maxCols;
       if (rct.r1 > maxRow || rct.c1 > maxCol) {
         rows.push({
           index: item.index, external: false, sheetName: sheetName,
