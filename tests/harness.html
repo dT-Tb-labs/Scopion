@@ -173,8 +173,12 @@
 <div id="list" role="listbox" tabindex="0" aria-label="References"></div>
 
 <div class="chipbar" id="chipbar" style="display:none">
-  <button id="btnRehide">Re-hide sheets</button>
-  <button id="btnHome">Return to origin</button>
+  <button id="btnRehide">隠しシートを戻す</button>
+</div>
+
+<div class="chipbar">
+  <button id="btnHome">元のセルに戻る</button>
+  <button id="btnClose">終了 (Esc)</button>
 </div>
 
 <details class="opts">
@@ -185,7 +189,7 @@
 </details>
 
 <footer>
-  <span>↑↓ walk · ⏎ drill · ← back · p/d mode · esc origin</span>
+  <span>↑↓ 移動 · ⏎ 掘る · ← 戻る · p/d 参照元/先 · esc 終了</span>
   <span id="pollLabel">following</span>
 </footer>
 
@@ -1908,7 +1912,8 @@ function scopionRehide(sheetNames, originTarget) {
 // ---- google.script.run shim with latency ------------------------------------
 window.__rpcLog = [];
 window.__latency = 250;
-window.google = { script: { run: null } };
+window.__closed = false;
+window.google = { script: { run: null, host: { close: () => { window.__closed = true; } } } };
 function makeRunner() {
   let ok = function () {}, fail = function () {};
   const runner = {
@@ -2157,6 +2162,29 @@ function highlightRequest() {
 
 function consumeHighlight(selection) {
   S.painted = !!(selection.highlight && selection.highlight.applied);
+}
+
+/**
+ * Escape means "I'm done checking this formula".
+ *
+ * One round trip does all three things a modeller expects: the walked cell
+ * goes back to its own colour, the selection returns to the formula the audit
+ * started from, and the sidebar gets out of the way. Closing first would strand
+ * the paint, so the close waits for the restore either way.
+ */
+function closeScopion() {
+  var target = S.audit ? S.audit.origin.target : null;
+  var done = function () {
+    S.painted = false;
+    clearTimeout(S.pollTimer);
+    try { google.script.host.close(); } catch (e) {}
+  };
+  if (!target) { done(); return; }
+  S.generation++;
+  S.follow = false; // no poll may re-audit while we are leaving
+  rpc('scopionNavigate', { action: 'jump', target: target, highlight: { apply: false } })
+    .then(done)
+    .catch(done);
 }
 
 /** End of a walk: put the painted cell back. Fire-and-forget. */
@@ -2429,11 +2457,7 @@ $('list').addEventListener('keydown', function (ev) {
     if (S.activeIndex >= 0) activateRow(S.activeIndex);
   }
   else if (k === 'ArrowLeft' || k === 'Backspace') { goBack(); }
-  else if (k === 'Escape') {
-    // End of walk: return to the origin WITHOUT painting it — the walk
-    // highlight marks walked-to references, not the resting position.
-    if (S.audit) { clearHighlight(); requestJump(S.audit.origin.target, true); }
-  }
+  else if (k === 'Escape') { closeScopion(); }
   else if (k === 'p') { setMode('precedents'); }
   else if (k === 'd') { setMode('dependents'); }
   else return;
@@ -2496,6 +2520,8 @@ $('btnRehide').onclick = function () {
 $('btnHome').onclick = function () {
   if (S.audit) { clearHighlight(); requestJump(S.audit.origin.target, true); }
 };
+
+$('btnClose').onclick = closeScopion;
 
 ['showNamedRanges', 'traverseHidden', 'showExternal'].forEach(function (key) {
   $(key).onchange = function () {

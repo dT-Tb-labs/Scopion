@@ -72,7 +72,8 @@ ${server}
 // ---- google.script.run shim with latency ------------------------------------
 window.__rpcLog = [];
 window.__latency = 250;
-window.google = { script: { run: null } };
+window.__closed = false;
+window.google = { script: { run: null, host: { close: () => { window.__closed = true; } } } };
 function makeRunner() {
   let ok = function () {}, fail = function () {};
   const runner = {
