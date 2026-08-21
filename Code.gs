@@ -29,38 +29,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Scopion')
     .addItem('Open Scopion', 'showScopionSidebar')
-    .addItem('Open with this file (on/off)', 'scopionToggleAutoOpen')
     .addToUi();
-}
-
-/**
- * The installable-trigger handler.
- *
- * A simple onOpen cannot show a sidebar — it runs without authorization, so
- * showSidebar throws and the panel never appears (measured: onOpen completes
- * in 0.7s and nothing opens). An installable open trigger runs authorized and
- * may, which is the only way to have the panel there without launching it.
- */
-function scopionAutoOpen() {
-  showScopionSidebar();
-}
-
-function scopionToggleAutoOpen() {
-  var ss = SpreadsheetApp.getActive();
-  var ui = SpreadsheetApp.getUi();
-  var mine = ScriptApp.getUserTriggers(ss).filter(function (t) {
-    return t.getHandlerFunction() === 'scopionAutoOpen';
-  });
-
-  if (mine.length) {
-    for (var i = 0; i < mine.length; i++) ScriptApp.deleteTrigger(mine[i]);
-    ui.alert('Scopion', 'Scopion will not open by itself any more.', ui.ButtonSet.OK);
-    return;
-  }
-
-  ScriptApp.newTrigger('scopionAutoOpen').forSpreadsheet(ss).onOpen().create();
-  showScopionSidebar();
-  ui.alert('Scopion', 'Scopion will now open with this file.', ui.ButtonSet.OK);
 }
 
 function onInstall(e) {
