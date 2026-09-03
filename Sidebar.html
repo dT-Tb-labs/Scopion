@@ -593,8 +593,15 @@ function renderCrumbs() {
   el.appendChild(cur);
 }
 
+var DIRECTION_LABEL = { up: 'above', down: 'below', left: 'to the left', right: 'to the right' };
+
 function renderWarnings(audit) {
   var html = '';
+  if (audit.origin.rowNeighborFlags && audit.origin.rowNeighborFlags.length) {
+    html += '<div class="warn amber"><b>Differs from the formula ' +
+      audit.origin.rowNeighborFlags.map(function (f) { return DIRECTION_LABEL[f.direction]; }).join(', ') +
+      '</b></div>';
+  }
   if (audit.unresolved && audit.unresolved.length) {
     html += '<div class="warn amber"><b>Unresolved dynamic references (' +
       audit.unresolved.length + ')</b><ul>';

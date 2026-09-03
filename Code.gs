@@ -384,7 +384,8 @@ function scopionAuditCore(request) {
       key: originSheetId + ':' + originBox.r1 + ':' + originBox.c1,
       target: { sheetId: originSheetId, row: originBox.r1, column: originBox.c1 },
       formula: found.formula || '',
-      value: displayValue(originCell)
+      value: displayValue(originCell),
+      rowNeighborFlags: neighborFlags(originSheet, originBox.r1, originBox.c1, found.formula || '')
     },
     mode: mode,
     rows: rows,
@@ -396,6 +397,38 @@ function scopionAuditCore(request) {
     settings: settings,
     elapsedMs: Date.now() - started
   };
+}
+
+/**
+ * Compares the origin formula's structural pattern (see formulaPattern) against
+ * its up/down/left/right neighbours, one 3x3 read for all four. A neighbour
+ * that is blank or off the grid is not a mismatch — there is nothing to compare
+ * against, so silence there would be a false alarm, not a clean bill of health.
+ */
+function neighborFlags(sheet, row, col, formula) {
+  if (!formula) return [];
+  var maxRows = sheet.getMaxRows(), maxCols = sheet.getMaxColumns();
+  var r1 = Math.max(1, row - 1), r2 = Math.min(maxRows, row + 1);
+  var c1 = Math.max(1, col - 1), c2 = Math.min(maxCols, col + 1);
+  var block = sheet.getRange(r1, c1, r2 - r1 + 1, c2 - c1 + 1).getFormulas();
+  var originPattern = formulaPattern(formula, row, col);
+
+  var dirs = [
+    { name: 'up', row: row - 1, col: col },
+    { name: 'down', row: row + 1, col: col },
+    { name: 'left', row: row, col: col - 1 },
+    { name: 'right', row: row, col: col + 1 }
+  ];
+  var flags = [];
+  dirs.forEach(function (d) {
+    if (d.row < 1 || d.row > maxRows || d.col < 1 || d.col > maxCols) return;
+    var nf = block[d.row - r1][d.col - c1];
+    if (!nf) return; // blank neighbour: nothing to compare
+    if (formulaPattern(nf, d.row, d.col) !== originPattern) {
+      flags.push({ direction: d.name, formula: nf });
+    }
+  });
+  return flags;
 }
 
 /** Reject anything from the browser that is not a real sheet and a legal A1 range. */

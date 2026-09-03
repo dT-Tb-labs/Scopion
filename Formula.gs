@@ -344,6 +344,45 @@ function dedupeRefs(refs) {
 }
 
 /**
+ * A structural signature for a formula, relative to the cell it lives in:
+ * every unanchored reference becomes an R[dr]C[dc] offset from (row, col), an
+ * anchored ($) axis becomes its literal address, and everything else (funcs,
+ * literals, operators) is kept verbatim. Two formulas dragged across a run of
+ * cells produce the same signature; one that was hand-edited does not.
+ *
+ * Heuristic, not a formula engine: sheet-qualified refs keep their sheet text
+ * verbatim (only the cell part is offset), and a malformed ref token is passed
+ * through as-is rather than thrown on. Good enough for a consistency hint.
+ */
+function formulaPattern(formula, row, col) {
+  if (!formula) return null;
+  var tokens = tokenize(formula);
+  var out = [];
+  for (var i = 0; i < tokens.length; i++) {
+    var t = tokens[i];
+    if (t.type === TOK.REF) {
+      out.push(t.value.split(':').map(function (p) { return patternRef(p, row, col); }).join(':'));
+    } else if (t.type === TOK.SHEET) {
+      out.push(t.raw + '!');
+    } else if (t.type === TOK.STRING) {
+      out.push('"' + t.value + '"');
+    } else {
+      out.push(t.value);
+    }
+  }
+  return out.join(' ');
+}
+
+function patternRef(text, row, col) {
+  var m = /^(\$)?([A-Za-z]{1,3})(\$)?([0-9]{1,8})$/.exec(text);
+  if (!m) return text;
+  var refCol = colToNum(m[2]), refRow = parseInt(m[4], 10);
+  var colPart = m[1] ? 'C' + refCol : 'C[' + (refCol - col) + ']';
+  var rowPart = m[3] ? 'R' + refRow : 'R[' + (refRow - row) + ']';
+  return rowPart + colPart;
+}
+
+/**
  * Split the argument list of the call whose FUNC token sits at `funcIndex`,
  * returning the raw source text of each top-level argument. Bracket- and
  * string-aware, so nested calls and commas inside literals stay intact.

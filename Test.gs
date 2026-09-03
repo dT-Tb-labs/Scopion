@@ -269,6 +269,32 @@ function runTests() {
     assertEq(rectToA1(viaName[0].rect), 'C5', 'INDEX(Sales,4) is the 4th row of Sales');
   });
 
+  // --- formulaPattern (row/column neighbour consistency signature) -------
+  t.push(function () {
+    assertEq(formulaPattern('=A1+B1', 5, 3), formulaPattern('=A2+B2', 6, 3),
+      'a formula dragged down a column keeps the same relative pattern');
+    assertEq(formulaPattern('=A1+B1', 5, 3), formulaPattern('=B1+C1', 5, 4),
+      'a formula dragged across a row keeps the same relative pattern');
+  });
+  t.push(function () {
+    assertEq(formulaPattern('=A1*2', 5, 3) === formulaPattern('=A1+2', 6, 3), false,
+      'a different operator breaks the pattern match');
+    assertEq(formulaPattern('=SUM(A1:A3)', 5, 3) === formulaPattern('=A1+A2+A3', 6, 3), false,
+      'a different function shape breaks the pattern match');
+  });
+  t.push(function () {
+    assertEq(formulaPattern('=$A$1', 5, 3), formulaPattern('=$A$1', 9, 9),
+      'a fully anchored reference is independent of the origin cell, on both axes');
+    assertEq(formulaPattern('=$A$1+B1', 5, 3) === formulaPattern('=$A$2+B2', 6, 3), false,
+      'an anchored reference that actually moved is a real mismatch');
+  });
+  t.push(function () {
+    assertEq(formulaPattern('=SUM(TaxRate)+A1', 5, 3), formulaPattern('=SUM(TaxRate)+A2', 6, 3),
+      'a named range is location-independent and matches verbatim');
+    assertEq(formulaPattern("='Data'!A1+B1", 5, 3), formulaPattern("='Data'!A2+B2", 6, 3),
+      'a cross-sheet reference offsets the same way as same-sheet');
+  });
+
   var failures = [];
   for (var i = 0; i < t.length; i++) {
     try { t[i](); } catch (e) { failures.push(e.message); }

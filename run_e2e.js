@@ -268,6 +268,22 @@ check('and does not pay for the same sheet extent twice', API_CALLS.n <= 12, tru
 delete model.cells[32];
 ss.sheets.pop();
 
+console.log('row/column neighbour consistency');
+// B40:B41 are the same formula dragged down a column; B42 was hand-edited to a
+// different operator. A1/C1 in each row are left blank on purpose.
+model.cells[40] = { 2: { formula: '=A40*2', value: 0, background: '#ffffff' } };
+model.cells[41] = { 2: { formula: '=A41*2', value: 0, background: '#ffffff' } };
+model.cells[42] = { 2: { formula: '=A42+2', value: 0, background: '#ffffff' } };
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'B40', mode: 'precedents' });
+check('a formula matching its only (down) neighbour raises no flag', res.origin.rowNeighborFlags, []);
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'B41', mode: 'precedents' });
+check('a hand-edited neighbour below is flagged, the matching one above is not',
+  res.origin.rowNeighborFlags, [{ direction: 'down', formula: '=A42+2' }]);
+res = sandbox.scopionAuditCore({ sheetName: 'Model', a1: 'B42', mode: 'precedents' });
+check('the same mismatch seen from the other side is "up"',
+  res.origin.rowNeighborFlags, [{ direction: 'up', formula: '=A41*2' }]);
+delete model.cells[40]; delete model.cells[41]; delete model.cells[42];
+
 check('huge totals switch to exponent notation',
   sandbox.formatNumber(2.8726055584439947e141), '2.87e+141');
 check('tiny totals switch to exponent notation',
