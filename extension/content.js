@@ -197,7 +197,10 @@
     var root = S.walk ? walkRoot(S.walk) : null;
     chrome.storage.local.set({ panelPos: S.panel.getPosition() });
     var p = root ? SheetsDom.jump(root.sheetName, root.a1) : Promise.resolve();
-    p.then(function () {
+    // The panel must close even if the return jump fails — nobody sees a notice once it is gone.
+    p.catch(function (e) {
+      console.warn('Scopion: could not return to the origin: ' + (e && e.message ? e.message : e));
+    }).then(function () {
       S.panel.close();
       S.walk = null; S.lastJump = null; S.busy = false;
       if (S.unhidden.length) console.info('Scopion left these sheets visible: ' + S.unhidden.join(', '));
