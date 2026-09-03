@@ -2,67 +2,6 @@
   "title": "Scopion (Google Sheets)",
   "rules": [
     {
-      "description": "Double-tap Right Command -> Cmd+Option+Shift+1 (Scopion macro) in browsers only",
-      "manipulators": [
-        {
-          "type": "basic",
-          "from": {
-            "key_code": "right_command",
-            "modifiers": { "optional": ["any"] }
-          },
-          "to": [
-            { "set_variable": { "name": "scopion_tap", "value": 0 } },
-            {
-              "key_code": "1",
-              "modifiers": ["left_command", "left_option", "left_shift"]
-            }
-          ],
-          "conditions": [
-            { "type": "variable_if", "name": "scopion_tap", "value": 1 },
-            {
-              "type": "frontmost_application_if",
-              "bundle_identifiers": [
-                "^com\\.google\\.Chrome$",
-                "^com\\.apple\\.Safari$",
-                "^org\\.mozilla\\.firefox$",
-                "^com\\.microsoft\\.edgemac$"
-              ]
-            }
-          ]
-        },
-        {
-          "type": "basic",
-          "from": {
-            "key_code": "right_command",
-            "modifiers": { "optional": ["any"] }
-          },
-          "to": [
-            { "set_variable": { "name": "scopion_tap", "value": 1 } },
-            { "key_code": "right_command" }
-          ],
-          "to_delayed_action": {
-            "to_if_invoked": [
-              { "set_variable": { "name": "scopion_tap", "value": 0 } }
-            ],
-            "to_if_canceled": [
-              { "set_variable": { "name": "scopion_tap", "value": 0 } }
-            ]
-          },
-          "conditions": [
-            {
-              "type": "frontmost_application_if",
-              "bundle_identifiers": [
-                "^com\\.google\\.Chrome$",
-                "^com\\.apple\\.Safari$",
-                "^org\\.mozilla\\.firefox$",
-                "^com\\.microsoft\\.edgemac$"
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
       "description": "Cmd+Shift+A -> Cmd+Option+Shift+1 (Scopion macro) in browsers only",
       "manipulators": [
         {
