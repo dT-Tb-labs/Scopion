@@ -1,0 +1,4 @@
+{
+  "client_id": "1234567890-abc.apps.googleusercontent.com",
+  "key": "<base64 DER public key of extension/scopion.pem — see README 'Chrome extension' section>"
+}

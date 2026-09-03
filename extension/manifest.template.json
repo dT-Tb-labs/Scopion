@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Scopion",
+  "version": "0.1.0",
+  "description": "Active Cell Explorer for Google Sheets: list a formula's precedents and walk them with the arrow keys.",
+  "key": "",
+  "permissions": ["identity", "storage"],
+  "host_permissions": ["https://docs.google.com/*", "https://sheets.googleapis.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/spreadsheets/*"],
+      "js": ["lib/formula.js", "lib/trace.js", "adapter.js", "audit.js", "state.js", "dom.js", "panel.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-scopion": {
+      "suggested_key": { "default": "Ctrl+Shift+A", "mac": "Ctrl+Shift+A" },
+      "description": "Open Scopion on the selected cell (re-audit when already open)"
+    }
+  },
+  "oauth2": {
+    "client_id": "",
+    "scopes": ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+  }
+}

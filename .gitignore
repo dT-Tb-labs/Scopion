@@ -2,3 +2,8 @@
 .claude/
 node_modules/
 .sol/
+extension/lib/
+extension/manifest.json
+extension/oauth.local.json
+extension/*.pem
+extension/test/oauth.tmp.json
