@@ -126,3 +126,31 @@ test('a selection audits its top-left cell', async () => {
   const { res } = await run('A1:B3');
   assert.equal(res.origin.a1, 'A1');
 });
+
+// fetchRectFor's shrink-to-top-left path: a bounded reference is used (not a
+// whole-column A:Z), because a1ToRect always parses a whole column out to
+// MAX_ROW regardless of the sheet's actual rowCount, which would swamp the
+// 130,000/50,000-cell math below by orders of magnitude.
+function runRect(rowCount, colCount, a1Range) {
+  const meta = JSON.parse(JSON.stringify(require('./fixtures/meta.json')));
+  meta.sheets[1].properties.gridProperties.rowCount = rowCount;   // Inputs
+  meta.sheets[1].properties.gridProperties.columnCount = colCount;
+  const formula = `=SUM(Inputs!${a1Range})`;
+  const cells = { Model: { 1: { 1: F(formula) } } };
+  const snap = new S.Snapshot(meta);
+  const api = makeFakeApi(S, meta, cells);
+  return S.auditCell(api, snap, 'Model', 'A1', formula, {}).then((res) => ({ res, api }));
+}
+
+test('a reference past MAX_FETCH_CELLS is fetched as its top-left cell only', async () => {
+  const { res, api } = await runRect(5000, 26, 'A1:Z5000'); // 130,000 cells
+  assert.ok(api.calls[0].includes("'Inputs'!A1"));
+  assert.ok(!api.calls[0].includes("'Inputs'!A1:Z5000"));
+  assert.equal(res.rows[0].value, '(130,000 cells)');
+  assert.equal(api.calls.length, 1);
+});
+
+test('a reference exactly at MAX_FETCH_CELLS is fetched whole', async () => {
+  const { api } = await runRect(2000, 25, 'A1:Y2000'); // 50,000 cells, the cap
+  assert.ok(api.calls[0].includes("'Inputs'!A1:Y2000"));
+});
