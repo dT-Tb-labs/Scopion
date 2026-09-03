@@ -20,7 +20,7 @@
 - "Include hidden sheets" defaults to **off**.
 - Code style follows the repo: `function` declarations, `var` for module globals, JSDoc comments that say *why*. No bundler, no framework.
 - Every task ends with `node run_tests.js && node run_e2e.js && node --test extension/test/` green, then a commit. Commit messages: `<type>: <terse description>`, no AI attribution.
-- Deviation from spec, recorded here: `panel.css` is a JS string inside `panel.js` (Shadow DOM needs the CSS inside the shadow root; a manifest `css` entry cannot reach it). DOM tests cover the pure helpers of `dom.js`; selector glue is verified by the manual smoke test (Task 10) — Node has no DOM and adding jsdom is a dependency the spec does not want.
+- Deviation from spec, recorded here: `panel.css` is a JS string inside `panel.js` (Shadow DOM needs the CSS inside the shadow root; a manifest `css` entry cannot reach it). DOM tests cover the pure helpers of `dom.js`; selector glue is verified by the manual smoke test (Task 10) — Node has no DOM and adding jsdom is a dependency the spec does not want. The panel position persists as a single `panelPos` in `chrome.storage.local`, not per screen size. The spec's "hint row" for keyboard ownership is not a separate element; it is the panel's own grey (unfocused) selection colour, the same rule the current sidebar uses. First placement puts the panel directly below the active cell, not 8px below-right. The panel width (910px) is not single-sourced; it appears both in `PANEL_CSS` and again in `place()`.
 
 ## File structure
 
