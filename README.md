@@ -34,6 +34,44 @@ restored on the macOS side instead:
 The rule is scoped to browsers, so `Cmd+Shift+A` keeps its normal meaning
 everywhere else.
 
+## Chrome extension (Scopion)
+
+The extension reproduces the ACE window next to the selected cell and ships its
+own shortcut. It reads the sheet through the Sheets API, so it needs an OAuth
+client that you create once. Nothing is ever written to the spreadsheet.
+
+1. **Key** (makes the extension ID stable, which the OAuth client is tied to):
+   ```bash
+   openssl genrsa -out extension/scopion.pem 2048
+   openssl rsa -in extension/scopion.pem -pubout -outform DER | openssl base64 -A; echo
+   ```
+   The printed base64 is the `key` value. Extension ID:
+   ```bash
+   openssl rsa -in extension/scopion.pem -pubout -outform DER | node -e "const c=require('crypto');let b=[];process.stdin.on('data',d=>b.push(d)).on('end',()=>{const h=c.createHash('sha256').update(Buffer.concat(b)).digest('hex').slice(0,32);console.log([...h].map(x=>String.fromCharCode(97+parseInt(x,16))).join(''))})"
+   ```
+2. **Google Cloud**: create a project → *APIs & Services ▸ Library* → enable
+   **Google Sheets API** → *OAuth consent screen*: External, publishing status
+   *Testing*, add your Google account as a test user, add the scope
+   `https://www.googleapis.com/auth/spreadsheets.readonly` → *Credentials ▸ Create
+   credentials ▸ OAuth client ID*, application type **Chrome Extension**, Item ID =
+   the extension ID from step 1. Copy the client ID.
+3. `cp extension/oauth.example.json extension/oauth.local.json` and fill in
+   `client_id` and `key`. This file is git-ignored.
+4. `node extension/build.js` → writes `extension/lib/` and `extension/manifest.json`.
+5. `chrome://extensions` → Developer mode → **Load unpacked** → the `extension/`
+   folder. Check the ID matches step 1.
+6. Open a spreadsheet, select a formula cell, press **Ctrl+Shift+A**. The first
+   run asks for Google sign-in and read-only access. Rebind the key at
+   `chrome://extensions/shortcuts` if it clashes.
+
+Keys: ↑/↓ walk (the selection follows), Enter = New Origin, Backspace/← = Back,
+Esc = OK. "Include Hidden Sheets" is off by default because jumping into a hidden
+sheet makes Sheets unhide it; the panel says so when it happens.
+
+Tests: `node extension/build.js --lib-only && node --test extension/test/*.test.js`.
+Publishing on the Chrome Web Store additionally needs Google's verification of
+the sensitive `spreadsheets.readonly` scope.
+
 ## What changed in the port, and why
 
 | Excel original | Here | Reason |
