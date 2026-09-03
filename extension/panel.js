@@ -81,7 +81,8 @@ function createPanel(handlers) {
     var anyDyn = rows.some(function (r) { return r.dynamic || r.external; });
     var cols = anyFlag || anyDyn ? COLS_FULL : COLS_BASIC;
     var tpl = cols.map(function (w) { return w + 'px'; }).join(' ');
-    list.className = 'list' + (view.hasBlank ? ' blank' : '');
+    list.classList.toggle('blank', !!view.hasBlank);
+    list.classList.toggle('unfocused', list.getRootNode().activeElement !== list);
     list.innerHTML = rows.length ? '' : '<div class="row" style="grid-template-columns:1fr"><span>' +
       esc(view.originFormula ? 'No references found.' : 'Not a formula cell.') + '</span></div>';
     rows.forEach(function (r, i) {
@@ -112,10 +113,9 @@ function createPanel(handlers) {
     ['showExternal', 'showNames', 'includeHidden'].forEach(function (k) {
       $('input[data-key="' + k + '"]').checked = !!(v.settings && v.settings[k]);
     });
-    if (v.unresolved && v.unresolved.length) {
-      notice(v.unresolved.length + ' dynamic reference' + (v.unresolved.length > 1 ? 's' : '') + ' unresolved: ' +
-        v.unresolved.map(function (u) { return u.raw + ' (' + u.reason + ')'; }).join('; '));
-    }
+    notice(v.unresolved && v.unresolved.length ?
+      v.unresolved.length + ' dynamic reference' + (v.unresolved.length > 1 ? 's' : '') + ' unresolved: ' +
+        v.unresolved.map(function (u) { return u.raw + ' (' + u.reason + ')'; }).join('; ') : '');
     renderList();
   }
 
