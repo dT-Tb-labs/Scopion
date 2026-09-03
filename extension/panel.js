@@ -103,6 +103,13 @@ function createPanel(handlers) {
     if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
   }
 
+  /**
+   * v: {originFormula, names, rows, active, hasBlank, unresolved, canBack,
+   *     advanced, settings, busy, unhidden}. unhidden is the list of sheet
+   * names Sheets unhid during this session's jumps — shown as part of the
+   * notice, since a side-channel notice() call gets overwritten by the next
+   * render() (every caller renders right after a jump).
+   */
   function render(v) {
     view = v;
     body.className = 'body' + (v.advanced ? ' adv' : '') + (v.busy ? ' busy' : '');
@@ -113,9 +120,12 @@ function createPanel(handlers) {
     ['showExternal', 'showNames', 'includeHidden'].forEach(function (k) {
       $('input[data-key="' + k + '"]').checked = !!(v.settings && v.settings[k]);
     });
-    notice(v.unresolved && v.unresolved.length ?
+    var unresolvedText = v.unresolved && v.unresolved.length ?
       v.unresolved.length + ' dynamic reference' + (v.unresolved.length > 1 ? 's' : '') + ' unresolved: ' +
-        v.unresolved.map(function (u) { return u.raw + ' (' + u.reason + ')'; }).join('; ') : '');
+        v.unresolved.map(function (u) { return u.raw + ' (' + u.reason + ')'; }).join('; ') : '';
+    var unhiddenText = v.unhidden && v.unhidden.length ?
+      'Sheets unhid: ' + v.unhidden.join(', ') + ' — re-hide by hand when done.' : '';
+    notice(unresolvedText && unhiddenText ? unresolvedText + ' · ' + unhiddenText : (unresolvedText || unhiddenText));
     renderList();
   }
 

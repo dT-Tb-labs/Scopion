@@ -47,7 +47,7 @@
     return Object.assign({
       originFormula: w ? w.originFormula : '', names: w ? w.names : [], rows: w ? w.rows : [], active: w ? w.active : -1,
       hasBlank: w ? w.hasBlank : false, unresolved: w ? w.unresolved : [], canBack: !!(w && w.history.length),
-      advanced: S.advanced, settings: S.settings, busy: S.busy
+      advanced: S.advanced, settings: S.settings, busy: S.busy, unhidden: S.unhidden
     }, extra || {});
   }
   function render() { S.panel.render(view()); }
@@ -97,10 +97,8 @@
     var wasHidden = sheet && sheet.isSheetHidden() && S.unhidden.indexOf(cell.sheetName) < 0;
     return SheetsDom.jump(cell.sheetName, cell.a1).then(function () {
       S.lastJump = cell;
-      if (wasHidden) {
-        S.unhidden.push(cell.sheetName);
-        S.panel.notice('Sheets unhid "' + cell.sheetName + '" to show it. Re-hide it by hand when you are done.');
-      }
+      // The caller's render() (part of the view now, not a side-channel notice) shows this.
+      if (wasHidden) S.unhidden.push(cell.sheetName);
       paintHighlights();
       S.panel.focus();
     });
@@ -208,6 +206,7 @@
   }
 
   function setSetting(key, value) {
+    if (S.busy) { render(); return; } // puts the checkbox back to the stored value
     S.settings[key] = value;
     chrome.storage.sync.set({ settings: S.settings });
     // Settings change what the list shows, so re-audit the current origin (ACE: ChangeColumns + rebuild).
@@ -235,6 +234,7 @@
     });
     chrome.runtime.onMessage.addListener(function (msg) {
       if (!msg || msg.type !== 'scopion:toggle') return;
+      if (S.busy) return; // an open()/newOrigin() is already in flight
       var missing = sheetsSelfCheck(document);
       if (missing.length) { S.panel.open(null, S.savedPos); S.panel.render(view()); S.panel.notice('Sheets layout changed; missing ' + missing.join(', ')); return; }
       if (!S.panel.isOpen()) open(); else newOrigin();
