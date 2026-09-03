@@ -1,0 +1,14 @@
+{
+  "sheets": [
+    { "properties": { "sheetId": 0, "title": "Model", "gridProperties": { "rowCount": 1000, "columnCount": 26 } } },
+    { "properties": { "sheetId": 1, "title": "Inputs", "gridProperties": { "rowCount": 1000, "columnCount": 26 } } },
+    { "properties": { "sheetId": 2, "title": "Hidden Calc", "hidden": true, "gridProperties": { "rowCount": 1000, "columnCount": 26 } } },
+    { "properties": { "sheetId": 3, "title": "O'Connor", "gridProperties": { "rowCount": 50, "columnCount": 10 } } }
+  ],
+  "namedRanges": [
+    { "namedRangeId": "n1", "name": "Growth", "range": { "sheetId": 1, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 1, "endColumnIndex": 2 } },
+    { "namedRangeId": "n2", "name": "Shift", "range": { "sheetId": 1, "startRowIndex": 2, "endRowIndex": 3, "startColumnIndex": 1, "endColumnIndex": 2 } },
+    { "namedRangeId": "n3", "name": "WholeCol", "range": { "sheetId": 1, "startColumnIndex": 0, "endColumnIndex": 1 } },
+    { "namedRangeId": "n4", "name": "Orphan", "range": { "sheetId": 99, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": 1 } }
+  ]
+}
