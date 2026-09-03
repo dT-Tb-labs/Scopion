@@ -114,7 +114,9 @@
 
   function open() {
     setBusy(true);
-    return loadPrefs().then(function () { return ensureSnapshot(); }).then(function () {
+    // Force a fresh snapshot on every open: values and formulas change between
+    // opens, and one extra metadata call per open is cheap.
+    return loadPrefs().then(function () { return ensureSnapshot(true); }).then(function () {
       var cell = currentCell();
       return audit(cell, SheetsDom.formula()).then(function (res) {
         S.walk = walkFrom(res, []);

@@ -154,3 +154,46 @@ test('a reference exactly at MAX_FETCH_CELLS is fetched whole', async () => {
   const { api } = await runRect(2000, 25, 'A1:Y2000'); // 50,000 cells, the cap
   assert.ok(api.calls[0].includes("'Inputs'!A1:Y2000"));
 });
+
+test('auditing a sheet the snapshot does not know rejects instead of reading the wrong sheet', async () => {
+  const snap = new S.Snapshot(meta);
+  const api = makeFakeApi(S, meta, CELLS);
+  await assert.rejects(S.auditCell(api, snap, 'Nope', 'A1', '=1', {}), /not in the snapshot/);
+});
+
+// Regression: buildRows must read through a cache built AFTER the dynamic
+// target's fetch, not the resolver's own cache. RECT_READS_BEFORE_GRID (8, in
+// lib/trace.js) means a ValueCache's 9th distinct read of a sheet switches it
+// to holding that sheet's whole grid in memory, taken at that instant. Here
+// the resolver's cache hits that switch while resolving OFFSET's row-offset
+// argument (nine distinct Inputs!D1..D9 reads) — before Inputs!B1:B3, the
+// OFFSET target itself, has been fetched. The grid snapshot the cache
+// promoted to therefore holds B1 (fetched already) but blank B2/B3 (not yet
+// fetched), and stays that way for the rest of that cache instance's life
+// even after B2/B3 land in the snapshot from the second fetch. Reusing that
+// cache for buildRows would print the range's total from the stale blanks.
+function runNineReads() {
+  const cells = {
+    Inputs: {
+      // column B: B1:B3; column D: D1..D9 (each 1), one per row 1-9
+      1: { 2: { v: 0.05 }, 4: { v: 1 } }, 2: { 2: { v: 100 }, 4: { v: 1 } }, 3: { 2: { v: 1 }, 4: { v: 1 } },
+      4: { 4: { v: 1 } }, 5: { 4: { v: 1 } }, 6: { 4: { v: 1 } },
+      7: { 4: { v: 1 } }, 8: { 4: { v: 1 } }, 9: { 4: { v: 1 } }
+    }
+  };
+  const dSum = 'Inputs!D1+Inputs!D2+Inputs!D3+Inputs!D4+Inputs!D5+Inputs!D6+Inputs!D7+Inputs!D8+Inputs!D9';
+  const formula = `=OFFSET(Inputs!B1,${dSum}-9,0,3,1)`;
+  cells.Model = { 1: { 1: F(formula) } };
+  const snap = new S.Snapshot(meta);
+  const api = makeFakeApi(S, meta, cells);
+  return S.auditCell(api, snap, 'Model', 'A1', formula, {}).then((res) => ({ res, api }));
+}
+
+test('the range row after a dynamic target is built from a fresh cache, not the resolver\'s', async () => {
+  const { res, api } = await runNineReads();
+  assert.equal(api.calls.length, 2, 'B1:B3 is not fully covered by call 1, so it costs a second call');
+  assert.ok(api.calls[1].includes("'Inputs'!B1:B3"));
+  const row = res.rows.find((r) => r.dynamic && r.address === 'B1:B3');
+  assert.ok(row, 'no dynamic B1:B3 row in ' + JSON.stringify(res.rows.map((r) => r.address)));
+  assert.equal(row.value, '101.05 (3)');
+});

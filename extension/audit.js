@@ -31,7 +31,9 @@ function dedupeRects(rs) {
   for (var i = 0; i < rs.length; i++) {
     var r = rs[i];
     if (!r) continue;
-    var k = [r.sheetName, r.r1, r.c1, r.r2, r.c2].join('|');
+    // JSON.stringify, not join('|'): a sheet name containing '|' would collide
+    // with a neighbouring rect's key and drop a fetch (a false blank).
+    var k = JSON.stringify([r.sheetName, r.r1, r.c1, r.r2, r.c2]);
     if (seen[k]) continue;
     seen[k] = true;
     out.push(r);
@@ -70,6 +72,11 @@ function fetchRects(api, snap, rects) {
 }
 
 function auditCell(api, snap, sheetName, a1, formula, settings) {
+  // Guard first: a stale walk (or a jump that landed on a sheet the snapshot
+  // never heard of) must fail loudly, not fall through and read another sheet.
+  if (!snap.getSheetByName(sheetName)) {
+    return Promise.reject(new Error('Sheet "' + sheetName + '" is not in the snapshot — reopen Scopion.'));
+  }
   settings = Object.assign({}, DEFAULT_SETTINGS, settings || {});
   var namedRanges = buildNamedRangeMap(snap);
   var box = a1ToRect(a1, sheetName);
@@ -86,7 +93,10 @@ function auditCell(api, snap, sheetName, a1, formula, settings) {
         .filter(function (t) { return t.rect; })
         .map(function (t) { return fetchRectFor(snap, t.rect); });
       return fetchRects(api, snap, dedupeRects(extra)).then(function () {
-        var rows = buildRows(snap, found.targets, cache, settings);
+        // A fresh cache, not `cache`: the resolver's cache may have memoised
+        // pre-fetch blanks, or a whole-grid snapshot taken before the dynamic
+        // targets arrived, and either would print a stale value here.
+        var rows = buildRows(snap, found.targets, new ValueCache(snap), settings);
         return {
           origin: {
             sheetName: sheetName,
@@ -146,6 +156,7 @@ function buildRows(snap, targets, cache, settings) {
   return rows;
 }
 
+// namesCovering/rangeTotal/formatNumber/safeUrl below have a twin copy in the frozen Code.gs — change one, change both.
 /** Defined names whose range covers the audited cell (ACE's txtNames box). */
 function namesCovering(namedRanges, sheetName, a1) {
   var cell = a1ToRect(a1, sheetName);

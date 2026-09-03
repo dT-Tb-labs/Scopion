@@ -90,6 +90,7 @@ function createPanel(handlers) {
       el.className = 'row' + (i === view.active ? ' on' : '') + (r.external ? ' ext' : '');
       el.style.gridTemplateColumns = tpl;
       el.setAttribute('role', 'option');
+      el.setAttribute('aria-selected', i === view.active ? 'true' : 'false');
       el.dataset.index = i;
       el.innerHTML =
         '<span title="' + esc(r.sheetName) + '">' + esc(r.sheetName) + '</span>' +

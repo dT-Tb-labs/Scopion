@@ -6,6 +6,7 @@ const S = loadSandbox();
 test('spreadsheet id from the path', () => {
   assert.equal(S.spreadsheetIdFromPath('/spreadsheets/d/11GMudQJ1VmzTgscq4sY82ceb1lHywWKisegzQPQC3P0/edit'), '11GMudQJ1VmzTgscq4sY82ceb1lHywWKisegzQPQC3P0');
   assert.equal(S.spreadsheetIdFromPath('/spreadsheets/u/0/'), null);
+  assert.equal(S.spreadsheetIdFromPath('/spreadsheets/u/0/d/abcDEF123_-/edit'), 'abcDEF123_-');
 });
 
 test('the name box shows an address, a range, or a name', () => {

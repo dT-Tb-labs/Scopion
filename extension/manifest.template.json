@@ -5,7 +5,7 @@
   "description": "Active Cell Explorer for Google Sheets: list a formula's precedents and walk them with the arrow keys.",
   "key": "",
   "permissions": ["identity", "storage"],
-  "host_permissions": ["https://docs.google.com/*", "https://sheets.googleapis.com/*"],
+  "host_permissions": ["https://docs.google.com/spreadsheets/*", "https://sheets.googleapis.com/*"],
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {

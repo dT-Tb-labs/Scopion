@@ -17,7 +17,8 @@ var SHEETS_SEL = {
 var JUMP_SETTLE_MS = 300;
 
 function spreadsheetIdFromPath(pathname) {
-  var m = /\/spreadsheets\/d\/([A-Za-z0-9_-]+)/.exec(pathname || '');
+  // Multi-account Chrome profiles put /u/0/ between /spreadsheets/ and /d/.
+  var m = /\/spreadsheets(?:\/u\/\d+)?\/d\/([A-Za-z0-9_-]+)/.exec(pathname || '');
   return m ? m[1] : null;
 }
 
@@ -87,13 +88,18 @@ var SheetsDom = {
   },
   /**
    * Move the grid selection by typing into the name box. Sheets rewrites the
-   * box with the landed address, so "value no longer what we typed" is the
-   * settle signal; the timeout covers a rejected reference.
+   * box with the landed address, but a cross-sheet jump can leave the formula
+   * bar (and even the name box, for a frame) still showing the previous cell —
+   * reading it that early mis-resolves dynamic targets. So the settle signal is
+   * not just "value changed": it is "value changed to something that parses as
+   * the target address (or the target name)". The timeout covers a rejected
+   * reference, where the box never settles on the target at all.
    */
   jump: function (sheetName, a1) {
     var nb = document.querySelector(SHEETS_SEL.nameBox);
     if (!nb) return Promise.reject(new Error('Sheets name box not found'));
     var target = quoteSheetName(sheetName) + '!' + a1;
+    var targetA1 = a1.toUpperCase();
     nb.focus();
     nb.value = target;
     nb.dispatchEvent(new Event('input', { bubbles: true }));
@@ -103,7 +109,11 @@ var SheetsDom = {
     return new Promise(function (resolve) {
       var t0 = Date.now();
       (function poll() {
-        if (nb.value !== target || Date.now() - t0 > JUMP_SETTLE_MS) return resolve();
+        if (Date.now() - t0 > JUMP_SETTLE_MS) return resolve();
+        if (nb.value !== target) {
+          var parsed = parseNameBox(nb.value);
+          if (parsed && (parsed.a1 === targetA1 || parsed.name)) return resolve();
+        }
         setTimeout(poll, 30);
       })();
     });

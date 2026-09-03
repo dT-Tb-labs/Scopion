@@ -53,7 +53,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     if (!msg || !msg.type) return false;
     var p;
     if (msg.type === 'scopion:meta') p = apiGet(metaUrl(msg.spreadsheetId), chromeDeps);
-    else if (msg.type === 'scopion:grid') p = apiGet(gridUrl(msg.spreadsheetId, msg.ranges || []), chromeDeps);
+    else if (msg.type === 'scopion:grid') {
+      // An empty ranges list means "the whole spreadsheet" to the Sheets API,
+      // not "nothing" — never send that request.
+      if (!msg.ranges || !msg.ranges.length) { sendResponse({ ok: false, error: 'no ranges' }); return true; }
+      p = apiGet(gridUrl(msg.spreadsheetId, msg.ranges), chromeDeps);
+    }
     else return false;
     p.then(function (data) { sendResponse({ ok: true, data: data }); },
            function (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); });

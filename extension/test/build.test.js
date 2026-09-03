@@ -25,6 +25,7 @@ test('build renders manifest.json from the template and the local oauth file', (
     assert.deepEqual(m.oauth2.scopes, ['https://www.googleapis.com/auth/spreadsheets.readonly']);
     assert.equal(m.commands['toggle-scopion'].suggested_key.default, 'Ctrl+Shift+A');
     assert.equal(m.commands['toggle-scopion'].suggested_key.mac, 'Ctrl+Shift+A');
+    assert.deepEqual(m.host_permissions, ['https://docs.google.com/spreadsheets/*', 'https://sheets.googleapis.com/*']);
   } finally {
     fs.unlinkSync(tmp);
     fs.rmSync(path.join(ext, 'manifest.json'), { force: true });
