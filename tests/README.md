@@ -49,3 +49,23 @@ list.focus();
 
 `painted()` returning more than one cell means a restore was missed — that is
 the orphaned-highlight bug, and it is the thing this check exists to catch.
+
+## Extension smoke test
+
+Run on the test spreadsheet (Model sheet) after `node extension/build.js` and loading `extension/` unpacked; needs the OAuth client from README 'Chrome extension'.
+
+```
+[ ] Select B6 (=B1*(1+Growth)); Ctrl+Shift+A → strip appears below-right of B6 within ~1 s
+[ ] List shows Model!B1 = 100 and Inputs-side Growth row; ORIGIN FORMULA shows the formula
+[ ] ↓ moves the highlight to the second row AND the grid selection moves there; green overlay on the cell
+[ ] ↑ returns; origin cell shows the dashed outline when standing on it
+[ ] Enter on B1 → list re-audits from B1 ("Not a formula cell." with empty list), Back enabled
+[ ] Backspace → back to B6 with the original list
+[ ] Select B7 (=OFFSET('Hidden Calc'!A1,Shift,0)); Ctrl+Shift+A while open → New Origin re-audits
+[ ] Hidden rows absent by default; Advanced → tick Include Hidden Sheets → Hidden Calc!A2 (H) appears
+[ ] ↓ onto Hidden Calc!A2 → sheet switches, notice says Sheets unhid it
+[ ] Esc → selection returns to B7, overlays gone, strip closed
+[ ] Right-click the Hidden Calc tab → シートを非表示 (restore the test sheet)
+[ ] Drag the strip by its title; Esc; reopen → same position
+[ ] Click a cell elsewhere, then press ↓ in the strip → the walk first returns to its last cell (resync), then moves
+```
