@@ -12,8 +12,9 @@
  */
 
 var ERROR_TEXT = {
-  DIV_0: '#DIV/0!', N_A: '#N/A', NAME: '#NAME?', NUM: '#NUM!',
-  REF: '#REF!', VALUE: '#VALUE!', ERROR: '#ERROR!', NULL_VALUE: '#NULL!'
+  DIVIDE_BY_ZERO: '#DIV/0!', N_A: '#N/A', NAME: '#NAME?', NUM: '#NUM!',
+  REF: '#REF!', VALUE: '#VALUE!', ERROR: '#ERROR!', NULL_VALUE: '#NULL!',
+  LOADING: 'Loading...'
 };
 var BLANK_CELL = { v: '', d: '', f: '' };
 

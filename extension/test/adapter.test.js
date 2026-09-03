@@ -5,14 +5,22 @@ const meta = require('./fixtures/meta.json');
 
 const S = loadSandbox();
 
+// Sheets API v4 ErrorValue.type enum: ERROR, NULL_VALUE, DIVIDE_BY_ZERO, VALUE,
+// REF, NAME, NUM, N_A, LOADING.
+const ERR_DISPLAY = {
+  ERROR: '#ERROR!', NULL_VALUE: '#NULL!', DIVIDE_BY_ZERO: '#DIV/0!', VALUE: '#VALUE!',
+  REF: '#REF!', NAME: '#NAME?', NUM: '#NUM!', N_A: '#N/A', LOADING: 'Loading...'
+};
+
 function grid(sheetId, startRow, startColumn, rows) {
-  // rows: array of arrays of cell specs {n:number}|{s:string}|{f:formula,n:number}|{err:'N_A'}|null
+  // rows: array of arrays of cell specs {n:number}|{s:string}|{b:boolean}|{f:formula,n:number}|{err:enumName}|null
   return { sheets: [{ properties: { sheetId }, data: [{ startRow, startColumn, rowData: rows.map((r) => ({
     values: r.map((c) => {
       if (c === null) return {};
       const v = {};
-      if (c.err) { v.effectiveValue = { errorValue: { type: c.err } }; v.formattedValue = '#N/A'; }
+      if (c.err) { v.effectiveValue = { errorValue: { type: c.err } }; v.formattedValue = ERR_DISPLAY[c.err] || '#ERROR!'; }
       else if (typeof c.n === 'number') { v.effectiveValue = { numberValue: c.n }; v.formattedValue = String(c.n); }
+      else if (typeof c.b === 'boolean') { v.effectiveValue = { boolValue: c.b }; v.formattedValue = String(c.b); }
       else if (typeof c.s === 'string') { v.effectiveValue = { stringValue: c.s }; v.formattedValue = c.s; }
       if (c.f) v.userEnteredValue = { formulaValue: c.f }; else if (v.effectiveValue) v.userEnteredValue = v.effectiveValue;
       return v;
@@ -48,7 +56,7 @@ test('buildNamedRangeMap from Trace.gs works on the snapshot', () => {
 
 test('grid data lands at startRow/startColumn and reads back as values, display values, formulas', () => {
   const snap = new S.Snapshot(meta);
-  snap.addGridData(grid(1, 1, 1, [[{ n: 100 }], [{ n: 0.05 }], [{ f: '=1+1', n: 2 }], [null], [{ err: 'N_A' }]]));
+  snap.addGridData(grid(1, 1, 1, [[{ n: 100 }], [{ n: 0.05 }], [{ f: '=1+1', n: 2 }], [null], [{ err: 'N_A' }], [{ err: 'DIVIDE_BY_ZERO' }], [{ b: true }]]));
   const inputs = snap.getSheetByName('Inputs');
   assert.equal(inputs.getRange('B2').getValue(), 100);
   assert.equal(inputs.getRange('B2').getDisplayValue(), '100');
@@ -57,6 +65,8 @@ test('grid data lands at startRow/startColumn and reads back as values, display 
   assert.equal(inputs.getRange('B4').getValue(), 2);
   assert.deepEqual(inputs.getRange('B5').getValues(), [['']]);
   assert.equal(inputs.getRange('B6').getValue(), '#N/A');
+  assert.equal(inputs.getRange('B7').getValue(), '#DIV/0!');
+  assert.equal(inputs.getRange('B8').getValue(), true);
   assert.deepEqual(inputs.getRange(2, 2, 2, 1).getValues(), [[100], [0.05]]);
   assert.deepEqual(inputs.getRange('B2:B3').getDisplayValues(), [['100'], ['0.05']]);
   assert.deepEqual(inputs.getRange('B2:B4').getFormulas(), [[''], [''], ['=1+1']]);
