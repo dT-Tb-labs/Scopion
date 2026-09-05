@@ -65,9 +65,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     return true; // keep the channel open for the async response
   });
 
+  // The shortcut and the toolbar icon are two doors to the same room: a user
+  // whose key is taken by another extension still has the icon.
+  function sendToggle(tab) {
+    if (!tab || tab.id === undefined) return;
+    chrome.tabs.sendMessage(tab.id, { type: 'scopion:toggle' }, function () { void chrome.runtime.lastError; });
+  }
   chrome.commands.onCommand.addListener(function (command, tab) {
-    if (command === 'toggle-scopion' && tab && tab.id !== undefined) {
-      chrome.tabs.sendMessage(tab.id, { type: 'scopion:toggle' }, function () { void chrome.runtime.lastError; });
-    }
+    if (command === 'toggle-scopion') sendToggle(tab);
   });
+  chrome.action.onClicked.addListener(sendToggle);
 }

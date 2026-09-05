@@ -7,6 +7,7 @@
   "permissions": ["identity", "storage"],
   "host_permissions": ["https://docs.google.com/spreadsheets/*", "https://sheets.googleapis.com/*"],
   "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Scopion — open on the selected cell (Ctrl+Shift+A)" },
   "content_scripts": [
     {
       "matches": ["https://docs.google.com/spreadsheets/*"],
