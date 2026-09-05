@@ -16,7 +16,7 @@ var PANEL_CSS = [
   '.list.blank{background:#ffff99}.list.unfocused .row.on{background:#d9d9d9;color:#000}',
   '.row{display:grid;height:16px;line-height:16px;white-space:nowrap;cursor:default}',
   '.row>span{overflow:hidden;text-overflow:ellipsis;padding:0 3px}.row .v{text-align:right;font-variant-numeric:tabular-nums}',
-  '.row.on{background:#0078d7;color:#fff}.row.ext{color:#5a3d8a}.row .flag{text-align:center}',
+  '.row.on{background:#0078d7;color:#fff}.row.ext{color:#5a3d8a}.row .flag{text-align:center}.row.is-origin{font-weight:bold}',
   '.origin{position:absolute;left:473px;top:0;width:430px;height:60px;background:#fff;border:1px inset #999;padding:2px 4px;overflow:auto;white-space:pre-wrap;word-break:break-all;font-family:Consolas,Menlo,monospace}',
   '.names{position:absolute;left:473px;top:64px;width:350px;height:18px;background:#fff;border:1px inset #999;padding:0 4px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
   'button{position:absolute;height:22px;padding:0 8px;font:inherit;background:linear-gradient(#fff,#e1e1e1);border:1px solid #707070;border-radius:2px;cursor:pointer}',
@@ -87,7 +87,7 @@ function createPanel(handlers) {
       esc(view.originFormula ? 'No references found.' : 'Not a formula cell.') + '</span></div>';
     rows.forEach(function (r, i) {
       var el = document.createElement('div');
-      el.className = 'row' + (i === view.active ? ' on' : '') + (r.external ? ' ext' : '');
+      el.className = 'row' + (i === view.active ? ' on' : '') + (r.external ? ' ext' : '') + (r.isOrigin ? ' is-origin' : '');
       el.style.gridTemplateColumns = tpl;
       el.setAttribute('role', 'option');
       el.setAttribute('aria-selected', i === view.active ? 'true' : 'false');

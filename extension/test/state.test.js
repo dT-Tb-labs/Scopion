@@ -34,6 +34,15 @@ test('drill pushes the old origin; back pops it; root is the first origin', () =
   assert.equal(S.walkBack(S.createWalk(o('A1'), rows)), null);
 });
 
+test('the origin is row 0, jumpable, with its value; precedents follow untouched', () => {
+  const out = S.withOriginRow({ sheetName: 'Model', a1: 'B6', value: '105' }, rows);
+  assert.equal(out.length, rows.length + 1);
+  assert.deepEqual(out[0], { external: false, sheetName: 'Model', flag: '', address: 'B6', value: '105', subFormula: '',
+    viaName: '', dynamic: false, isBlank: false, jumpable: true, isOrigin: true });
+  assert.equal(out[1], rows[0]);
+  assert.equal(S.withOriginRow({ sheetName: 'Model', a1: 'B6' }, [])[0].value, '');
+});
+
 test('state functions do not mutate their input', () => {
   const w = S.createWalk(o('A1'), rows);
   S.walkMove(w, 1); S.walkDrill(w, o('B2'), []);

@@ -43,6 +43,7 @@ test('plain cross-sheet refs: one fetch covering origin and both references', as
   assert.deepEqual(api.calls[0].slice().sort(), ["'Inputs'!B1", "'Inputs'!B2", "'Model'!A1"]);
   assert.equal(res.hasBlank, false);
   assert.equal(res.origin.formula, '=Inputs!B2*(1+Inputs!B1)');
+  assert.equal(res.origin.value, '0', 'the origin carries its own display value for the list');
 });
 
 test('OFFSET into a hidden sheet: resolved target fetched second, hidden rows follow the setting', async () => {

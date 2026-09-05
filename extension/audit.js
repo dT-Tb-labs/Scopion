@@ -101,6 +101,8 @@ function auditCell(api, snap, sheetName, a1, formula, settings) {
           origin: {
             sheetName: sheetName,
             a1: a1,
+            // ACE's list starts with the origin itself; the panel needs its value.
+            value: snap.getSheetByName(sheetName).cell(box.r1, box.c1).d,
             formula: found.formula || formula,
             names: settings.showNames ? namesCovering(namedRanges, sheetName, a1) : []
           },

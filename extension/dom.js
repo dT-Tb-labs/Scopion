@@ -10,6 +10,7 @@ var SHEETS_SEL = {
   nameBox: '#t-name-box',
   formulaBar: '#t-formula-bar-input',
   activeBorder: '.active-cell-border',
+  selectionBorder: '.selection-border',
   tab: '.docs-sheet-tab',
   tabName: '.docs-sheet-tab-name',
   activeTab: '.docs-sheet-active-tab'
@@ -55,6 +56,16 @@ function sheetsSelfCheck(doc) {
   return missing;
 }
 
+/** Border pieces that are actually drawn. Sheets keeps hidden ones in the DOM at 0×0 at the page corner. */
+function borderRects(selector) {
+  var els = document.querySelectorAll(selector), rects = [];
+  for (var i = 0; i < els.length; i++) {
+    var r = els[i].getBoundingClientRect();
+    if (r.width > 0 || r.height > 0) rects.push(r);
+  }
+  return rects;
+}
+
 var SheetsDom = {
   spreadsheetId: function () { return spreadsheetIdFromPath(location.pathname); },
   activeSheetName: function () {
@@ -72,10 +83,15 @@ var SheetsDom = {
     return t.charAt(0) === '=' ? t : '';
   },
   cellRect: function () {
-    var els = document.querySelectorAll(SHEETS_SEL.activeBorder);
-    var rects = [];
-    for (var i = 0; i < els.length; i++) rects.push(els[i].getBoundingClientRect());
-    return unionRects(rects);
+    return unionRects(borderRects(SHEETS_SEL.activeBorder));
+  },
+  /**
+   * The whole selection: a multi-cell selection draws four `.selection-border`
+   * pieces around the block (verified live), a single cell draws none — then
+   * the active-cell border is the selection.
+   */
+  selectionRect: function () {
+    return unionRects(borderRects(SHEETS_SEL.selectionBorder)) || unionRects(borderRects(SHEETS_SEL.activeBorder));
   },
   sheetTabs: function () {
     var tabs = document.querySelectorAll(SHEETS_SEL.tab), out = [];
@@ -99,7 +115,8 @@ var SheetsDom = {
     var nb = document.querySelector(SHEETS_SEL.nameBox);
     if (!nb) return Promise.reject(new Error('Sheets name box not found'));
     var target = quoteSheetName(sheetName) + '!' + a1;
-    var targetA1 = a1.toUpperCase();
+    // A range address ("B1:B3") lands with its top-left cell in the name box's parse.
+    var targetA1 = topLeftA1(a1).toUpperCase();
     nb.focus();
     nb.value = target;
     nb.dispatchEvent(new Event('input', { bubbles: true }));

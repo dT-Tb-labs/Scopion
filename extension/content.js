@@ -22,7 +22,33 @@
       });
     });
   }
-  var api = { getGrid: function (ranges) { return rpc({ type: 'scopion:grid', spreadsheetId: S.spreadsheetId, ranges: ranges }); } };
+  /**
+   * Debug trace on the host element's dataset. Content scripts live in an
+   * isolated world, so page-side tooling (and a curious developer's console)
+   * can only see what we put in the DOM. Last 20 entries, newest last.
+   */
+  var TRACE = [];
+  function trace(label, data) {
+    TRACE.push({ t: Date.now(), label: label, data: data });
+    if (TRACE.length > 20) TRACE.shift();
+    var host = document.getElementById('scopion-host');
+    if (host) host.dataset.trace = JSON.stringify(TRACE);
+  }
+
+  var api = {
+    getGrid: function (ranges) {
+      trace('grid:request', ranges);
+      return rpc({ type: 'scopion:grid', spreadsheetId: S.spreadsheetId, ranges: ranges }).then(function (resp) {
+        trace('grid:response', (resp.sheets || []).map(function (s) {
+          return { sheetId: s.properties && s.properties.sheetId, blocks: (s.data || []).map(function (b) {
+            return { startRow: b.startRow || 0, startColumn: b.startColumn || 0, rows: (b.rowData || []).length,
+              firstCell: b.rowData && b.rowData[0] && b.rowData[0].values && b.rowData[0].values[0] };
+          }) };
+        }));
+        return resp;
+      });
+    }
+  };
 
   function ensureSnapshot(force) {
     if (S.snap && !force) return Promise.resolve(S.snap);
@@ -52,7 +78,11 @@
   }
   function render() { S.panel.render(view()); }
   function setBusy(b) { S.busy = b; if (S.panel.isOpen()) render(); }
-  function fail(e) { setBusy(false); S.panel.notice('Scopion: ' + (e && e.message ? e.message : e)); }
+  function fail(e) {
+    trace('error', String(e && e.message ? e.message : e));
+    setBusy(false);
+    S.panel.notice('Scopion: ' + (e && e.message ? e.message : e));
+  }
 
   /** Where the grid selection is right now, as {sheetName, a1}. A named cell is resolved through the snapshot. */
   function currentCell() {
@@ -68,16 +98,20 @@
 
   /** Audit a cell. Refresh metadata once when the formula names something the snapshot does not know. */
   function audit(cell, formula, retried) {
+    trace('audit:start', { cell: cell, formula: formula, settings: S.settings });
     return ensureSnapshot().then(function (snap) {
+      trace('snapshot', { sheets: snap.getSheets().map(function (s) { return s.getName() + '#' + s.getSheetId() + (s.isSheetHidden() ? ' (hidden)' : ''); }),
+        names: snap.getNamedRanges().map(function (n) { return n.getName(); }) });
       return auditCell(api, snap, cell.sheetName, cell.a1, formula, S.settings);
     }).then(function (res) {
+      trace('audit:result', { origin: res.origin, rows: res.rows.length, unresolved: res.unresolved, unknownNames: res.unknownNames });
       if (res.unknownNames.length && !retried) return ensureSnapshot(true).then(function () { return audit(cell, formula, true); });
       return res;
     });
   }
 
   function walkFrom(res, history) {
-    var w = createWalk({ sheetName: res.origin.sheetName, a1: res.origin.a1 }, res.rows);
+    var w = createWalk({ sheetName: res.origin.sheetName, a1: res.origin.a1 }, withOriginRow(res.origin, res.rows));
     w.history = history || [];
     w.originFormula = res.origin.formula; w.names = res.origin.names; w.hasBlank = res.hasBlank; w.unresolved = res.unresolved;
     return w;
@@ -92,10 +126,11 @@
     return jump(S.lastJump);
   }
 
+  /** cell = {sheetName, a1 (top-left), address? (full range — ACE selects the whole block)}. */
   function jump(cell) {
     var sheet = S.snap && S.snap.getSheetByName(cell.sheetName);
     var wasHidden = sheet && sheet.isSheetHidden() && S.unhidden.indexOf(cell.sheetName) < 0;
-    return SheetsDom.jump(cell.sheetName, cell.a1).then(function () {
+    return SheetsDom.jump(cell.sheetName, cell.address || cell.a1).then(function () {
       S.lastJump = cell;
       // The caller's render() (part of the view now, not a side-channel notice) shows this.
       if (wasHidden) S.unhidden.push(cell.sheetName);
@@ -105,7 +140,7 @@
   }
 
   function paintHighlights() {
-    var rect = SheetsDom.cellRect();
+    var rect = SheetsDom.selectionRect();
     var w = S.walk;
     var onOrigin = w && S.lastJump && S.lastJump.sheetName === w.origin.sheetName && S.lastJump.a1 === w.origin.a1;
     S.panel.highlight(rect && !onOrigin ? rect : null, 'walk');
@@ -145,7 +180,7 @@
     render();
     if (!row.jumpable) return;
     setBusy(true);
-    resync().then(function () { return jump({ sheetName: row.sheetName, a1: topLeftA1(row.address) }); })
+    resync().then(function () { return jump({ sheetName: row.sheetName, a1: topLeftA1(row.address), address: row.address }); })
       .then(function () { setBusy(false); }).catch(fail);
   }
 
@@ -153,7 +188,7 @@
   function drill() {
     if (S.busy || !S.walk) return;
     var row = S.walk.rows[S.walk.active];
-    if (!row || !row.jumpable) return;
+    if (!row || !row.jumpable || row.isOrigin) return; // the origin is already the origin
     var cell = { sheetName: row.sheetName, a1: topLeftA1(row.address) };
     setBusy(true);
     resync().then(function () { return jump(cell); })
@@ -234,13 +269,18 @@
       onExternal: function (i) { var r = S.walk && S.walk.rows[i]; if (r && r.url) window.open(r.url, '_blank', 'noopener'); },
       onMoved: function (pos) { chrome.storage.local.set({ panelPos: pos }); }
     });
-    chrome.runtime.onMessage.addListener(function (msg) {
-      if (!msg || msg.type !== 'scopion:toggle') return;
+    function toggle() {
       if (S.busy) return; // an open()/newOrigin() is already in flight
       var missing = sheetsSelfCheck(document);
       if (missing.length) { S.panel.open(null, S.savedPos); S.panel.render(view()); S.panel.notice('Sheets layout changed; missing ' + missing.join(', ')); return; }
       if (!S.panel.isOpen()) open(); else newOrigin();
+    }
+    chrome.runtime.onMessage.addListener(function (msg) {
+      if (msg && msg.type === 'scopion:toggle') toggle();
     });
+    // Same door for page-side tooling (the smoke harness cannot press the
+    // real shortcut): document.dispatchEvent(new CustomEvent('scopion:toggle')).
+    document.addEventListener('scopion:toggle', toggle);
   }
 
   init();

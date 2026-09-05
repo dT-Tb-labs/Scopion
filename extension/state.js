@@ -6,6 +6,18 @@
 function createWalk(origin, rows) {
   return { origin: origin, rows: rows, active: rows.length ? 0 : -1, history: [] };
 }
+/**
+ * ACE's list begins with the origin cell itself (PopulateList calls FindName
+ * on oCheck before walking the arrows), so ↑ from the first precedent lands
+ * back on the origin. Row 0 is that cell; the precedents follow.
+ */
+function withOriginRow(origin, rows) {
+  return [{
+    external: false, sheetName: origin.sheetName, flag: '', address: origin.a1,
+    value: origin.value === undefined ? '' : origin.value, subFormula: '', viaName: '',
+    dynamic: false, isBlank: false, jumpable: true, isOrigin: true
+  }].concat(rows);
+}
 function walkMove(w, delta) {
   if (!w.rows.length) return w;
   var from = w.active < 0 ? 0 : w.active;
