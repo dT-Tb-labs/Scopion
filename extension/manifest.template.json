@@ -22,7 +22,7 @@
   ],
   "commands": {
     "toggle-scopion": {
-      "suggested_key": { "default": "Ctrl+Shift+A", "mac": "Ctrl+Shift+A" },
+      "suggested_key": { "default": "Ctrl+Shift+A", "mac": "MacCtrl+Shift+A" },
       "description": "__MSG_cmdToggle__"
     }
   },
