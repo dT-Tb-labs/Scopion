@@ -8,3 +8,4 @@ extension/oauth.local.json
 extension/*.pem
 extension/test/oauth.tmp.json
 dist/
+.playwright-mcp/

@@ -38,7 +38,9 @@ everywhere else.
 
 The extension reproduces the ACE window next to the selected cell and ships its
 own shortcut. It reads the sheet through the Sheets API, so it needs an OAuth
-client that you create once. Nothing is ever written to the spreadsheet.
+client that you create once. Its only write is hiding again the sheets it had
+to unhide for a walk (see "Keys" below). Install from the Chrome Web Store when
+it is listed; the steps below are for running it from source.
 
 1. **Key** (makes the extension ID stable, which the OAuth client is tied to):
    ```bash
@@ -79,11 +81,20 @@ Tests: `node extension/build.js --lib-only && node --test extension/test/*.test.
 
 Web Store upload: `node extension/build.js --pack` writes
 `dist/scopion-<version>.zip` holding only the files the extension runs
-(no tests, build script, credentials or `key`). Pass `--pem extension/scopion.pem`
-on the first upload so the store keeps the extension ID the OAuth client is
-tied to. Listing text, permission justifications and the privacy policy the
-dashboard asks for are in `docs/store/`. Publishing additionally needs Google's
-verification of the sensitive `spreadsheets` scope.
+(no tests, build script, credentials or `key`). The store assigns its own key,
+so the store item's ID may differ from the unpacked one: after the first upload
+compare the Item ID with the OAuth client's and update the client if they
+differ. `--pem extension/scopion.pem` puts the private key into the zip as
+`key.pem`, which is the undocumented way to keep the ID — use it only if you
+would rather hand Google the key than re-point the OAuth client. The manifest
+strings come from `extension/_locales/{en,ja}` and the
+store listing is entered per language from `docs/store/listing.en.md` /
+`listing.ja.md`; the dashboard checklist is `docs/store/listing.md`. On install
+(and on a toolbar click outside a spreadsheet) the extension opens
+`onboarding.html`, localised the same way. The privacy policy and homepage the
+store and Google's OAuth verification require are served from `docs/` by GitHub
+Pages. Publishing additionally needs Google's verification of the sensitive
+`spreadsheets` scope.
 
 ## What changed in the port, and why
 

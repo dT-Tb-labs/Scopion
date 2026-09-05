@@ -1,0 +1,28 @@
+{
+  "appName": { "message": "Scopion" },
+  "appDesc": { "message": "Google スプレッドシートの数式が参照するセルを一覧し、↑↓で順に移動。シート横断・非表示シートにも対応。財務モデルの監査に。Ctrl+Shift+A で起動。" },
+  "actionTitle": { "message": "Scopion — 選択中のセルで開く (Ctrl+Shift+A)" },
+  "cmdToggle": { "message": "選択中のセルで Scopion を開く（開いていれば再解析）" },
+
+  "obTitle": { "message": "Scopion をインストールしました" },
+  "obLead": { "message": "数式が参照しているセルを一覧し、順にたどれます。最初のトレースまで 3 ステップ:" },
+  "obStep1": { "message": "Google スプレッドシートを開きます（すでに開いていたタブは再読み込みしてください）。" },
+  "obStep2": { "message": "数式が入っているセルを選択します。" },
+  "obStep3": { "message": "Ctrl+Shift+A を押すか、ツールバーの Scopion アイコンをクリックします。" },
+  "obReload": { "message": "このスプレッドシートは Scopion のインストール前から開かれていました。タブを再読み込みしてから Ctrl+Shift+A を押してください。" },
+  "obConsentTitle": { "message": "Google のサインイン確認について" },
+  "obConsentBody": { "message": "最初のトレース時に、Google へのサインインとスプレッドシートへのアクセス許可を求められます。Scopion は Google Sheets API でシートを読み取り、値・名前付き範囲・非表示シートを表示します。書き込みは一種類だけです: 非表示シートにジャンプするとスプレッドシートがそのシートを表示状態にするため、パネルを閉じるときに Scopion が再び非表示に戻します（Excel ファイルでは戻せないため、パネルがその旨を表示します）。データは Google の API 以外のどこにも送られません。" },
+  "obKeysTitle": { "message": "キー操作" },
+  "obKeyWalk": { "message": "↑ ↓  参照先を順にたどる（選択セルも移動）" },
+  "obKeyDrill": { "message": "→  ハイライト中のセルを新しい起点にする" },
+  "obKeyBack": { "message": "←  または  Backspace  ひとつ前の起点に戻る" },
+  "obKeyStay": { "message": "Enter  その場に留まって閉じる" },
+  "obKeyReturn": { "message": "Esc  または  OK  開始位置に戻って閉じる" },
+  "obLimitsTitle": { "message": "知っておくと便利" },
+  "obLimit1": { "message": "スプレッドシートで開いた Excel ファイル (.xlsx) には API データがありません。参照とジャンプは動作し、値は — と表示され、たどった非表示シートは手動で戻すまで表示状態のままです。" },
+  "obLimit2": { "message": "OFFSET・INDEX・INDIRECT はリテラルと単一セルの値から解決します。解決できないものは「未解決」として表示され、黙って省かれることはありません。" },
+  "obLimit3": { "message": "Ctrl+Shift+A が他の拡張機能に使われている場合は、Chrome のショートカット設定で変更できます。" },
+  "obShortcuts": { "message": "ショートカット設定を開く" },
+  "obPrivacy": { "message": "プライバシーポリシー" },
+  "obSource": { "message": "ソースコードとサポート" }
+}

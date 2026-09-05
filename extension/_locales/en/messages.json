@@ -1,0 +1,28 @@
+{
+  "appName": { "message": "Scopion" },
+  "appDesc": { "message": "Trace a formula's inputs in Google Sheets: Ctrl+Shift+A, walk the referenced cells with ↑↓, across sheets. For financial models." },
+  "actionTitle": { "message": "Scopion — open on the selected cell (Ctrl+Shift+A)" },
+  "cmdToggle": { "message": "Open Scopion on the selected cell (re-audit when already open)" },
+
+  "obTitle": { "message": "Scopion is installed" },
+  "obLead": { "message": "It shows which cells a formula reads, and walks you through them. Three steps to the first trace:" },
+  "obStep1": { "message": "Open a Google Sheets spreadsheet (reload the tab if it was already open)." },
+  "obStep2": { "message": "Select a cell that contains a formula." },
+  "obStep3": { "message": "Press Ctrl+Shift+A, or click the Scopion icon in the toolbar." },
+  "obReload": { "message": "This spreadsheet was open before Scopion was installed. Reload the tab, then press Ctrl+Shift+A." },
+  "obConsentTitle": { "message": "The Google sign-in prompt, explained" },
+  "obConsentBody": { "message": "The first trace asks you to sign in and grant access to your spreadsheets. Scopion reads the sheet through the Google Sheets API to show values, named ranges and hidden sheets. It makes exactly one kind of change: when the walk enters a hidden sheet, Sheets unhides it, and Scopion hides it again when you close the panel (on an Excel file it cannot, and the panel says so). Nothing is sent anywhere except to Google's own API." },
+  "obKeysTitle": { "message": "Keys" },
+  "obKeyWalk": { "message": "↑ ↓  walk the references; the selection follows" },
+  "obKeyDrill": { "message": "→  make the highlighted cell the new origin" },
+  "obKeyBack": { "message": "←  or  Backspace  go back one origin" },
+  "obKeyStay": { "message": "Enter  close and stay where the walk left you" },
+  "obKeyReturn": { "message": "Esc  or  OK  return to where you started and close" },
+  "obLimitsTitle": { "message": "Good to know" },
+  "obLimit1": { "message": "Excel files opened in Sheets (.xlsx) have no API data: references and jumps work, values show as —, and hidden sheets you walked into stay visible until you re-hide them." },
+  "obLimit2": { "message": "OFFSET, INDEX and INDIRECT are resolved from literals and single-cell values; anything else is listed as unresolved, never dropped." },
+  "obLimit3": { "message": "If Ctrl+Shift+A is taken by another extension, rebind it in Chrome's shortcut settings." },
+  "obShortcuts": { "message": "Open shortcut settings" },
+  "obPrivacy": { "message": "Privacy policy" },
+  "obSource": { "message": "Source and support" }
+}

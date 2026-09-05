@@ -68,4 +68,6 @@ Run on the test spreadsheet (Model sheet) after `node extension/build.js` and lo
 [ ] Right-click the Hidden Calc tab → シートを非表示 (restore the test sheet)
 [ ] Drag the strip by its title; Esc; reopen → same position
 [ ] Click a cell elsewhere, then press ↓ in the strip → the walk first returns to its last cell (resync), then moves
+[ ] Click the toolbar icon on a non-Sheets tab → onboarding.html opens (EN, or JA on a Japanese Chrome)
+[ ] Load the unpacked build fresh (remove + Load unpacked) → onboarding.html opens once; a spreadsheet tab open before the load gets the reload banner when the icon is clicked
 ```

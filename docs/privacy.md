@@ -1,3 +1,9 @@
+---
+layout: default
+title: Privacy Policy
+permalink: /privacy/
+---
+
 # Scopion Privacy Policy
 
 _Last updated: 2026-09-05_
@@ -27,7 +33,9 @@ to it.
 
 The only change Scopion makes to a spreadsheet is to **hide again the sheets it
 had to unhide** so that you could jump into them, when you close the panel.
-It never edits cell contents, formatting or sharing.
+It never edits cell contents, formatting or sharing. For an Excel file opened
+in Sheets the Sheets API is unavailable, so Scopion cannot re-hide: the panel
+says so and asks you to re-hide by hand.
 
 ## Where the data goes
 
@@ -54,4 +62,4 @@ account at any time at <https://myaccount.google.com/permissions>.
 ## Changes and contact
 
 Changes to this policy will be published at this address with a new date.
-Questions: open an issue on the project repository.
+Questions: open an issue at <https://github.com/dT-Tb-labs/Scopion/issues>.

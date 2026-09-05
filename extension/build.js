@@ -32,6 +32,7 @@ const oauthPath = args.find((a) => !a.startsWith('--') && !flagValues.includes(a
 
 /** The files that ship. Anything not listed here stays out of the zip on purpose. */
 const SHIP = ['manifest.json', 'background.js', 'content.js', 'adapter.js', 'audit.js', 'state.js', 'dom.js', 'panel.js',
+  'onboarding.html', 'onboarding.js', '_locales/en/messages.json', '_locales/ja/messages.json',
   'lib/formula.js', 'lib/trace.js', 'icons/icon16.png', 'icons/icon32.png', 'icons/icon48.png', 'icons/icon128.png'];
 
 fs.mkdirSync(path.join(ext, 'lib'), { recursive: true });

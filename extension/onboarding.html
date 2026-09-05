@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scopion</title>
+<link rel="icon" href="icons/icon32.png">
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; background: #f3f5fb; color: #1c2333; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+  main { max-width: 640px; margin: 48px auto 64px; padding: 0 24px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  header img { width: 48px; height: 48px; border-radius: 12px; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: -.01em; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #5b6580; margin: 32px 0 10px; }
+  p { margin: 0 0 12px; }
+  ol { padding-left: 22px; margin: 0; }
+  ol li { margin: 6px 0; }
+  .card { background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(20,30,60,.06), 0 0 0 1px rgba(30,40,80,.08); }
+  .banner { background: #fff4d6; color: #7a4a00; border-radius: 10px; padding: 12px 14px; margin-bottom: 20px; box-shadow: 0 0 0 1px rgba(122,74,0,.18); font-weight: 600; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
+  .keys dt { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #eef1f8; border-radius: 6px; padding: 1px 8px; white-space: nowrap; align-self: start; }
+  .keys dd { margin: 0; }
+  ul { padding-left: 20px; margin: 0; }
+  ul li { margin: 6px 0; }
+  footer { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  footer a, footer button { font: inherit; font-weight: 600; color: #1c2333; text-decoration: none; background: #fff; border: 0; border-radius: 999px; padding: 8px 16px; cursor: pointer; box-shadow: 0 0 0 1px rgba(30,40,80,.14), 0 1px 2px rgba(20,30,60,.08); }
+  footer a:hover, footer button:hover { background: #f7f8fc; }
+  kbd { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #eef1f8; border-radius: 6px; padding: 1px 6px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/icon128.png" alt="">
+    <h1 data-i18n="obTitle">Scopion is installed</h1>
+  </header>
+
+  <div id="reload" class="banner" hidden data-i18n="obReload">This spreadsheet was open before Scopion was installed. Reload the tab, then press Ctrl+Shift+A.</div>
+
+  <p data-i18n="obLead">It shows which cells a formula reads, and walks you through them. Three steps to the first trace:</p>
+  <div class="card">
+    <ol>
+      <li data-i18n="obStep1">Open a Google Sheets spreadsheet (reload the tab if it was already open).</li>
+      <li data-i18n="obStep2">Select a cell that contains a formula.</li>
+      <li data-i18n="obStep3">Press Ctrl+Shift+A, or click the Scopion icon in the toolbar.</li>
+    </ol>
+  </div>
+
+  <h2 data-i18n="obConsentTitle">The Google sign-in prompt, explained</h2>
+  <p data-i18n="obConsentBody">The first trace asks you to sign in and grant access to your spreadsheets. Scopion reads the sheet through the Google Sheets API to show values, named ranges and hidden sheets. It makes exactly one kind of change: when the walk enters a hidden sheet, Sheets unhides it, and Scopion hides it again when you close the panel. Nothing is sent anywhere except to Google's own API.</p>
+
+  <h2 data-i18n="obKeysTitle">Keys</h2>
+  <div class="card">
+    <dl class="keys">
+      <dt>↑ ↓</dt><dd data-i18n="obKeyWalk">walk the references; the selection follows</dd>
+      <dt>→</dt><dd data-i18n="obKeyDrill">make the highlighted cell the new origin</dd>
+      <dt>← / Backspace</dt><dd data-i18n="obKeyBack">go back one origin</dd>
+      <dt>Enter</dt><dd data-i18n="obKeyStay">close and stay where the walk left you</dd>
+      <dt>Esc / OK</dt><dd data-i18n="obKeyReturn">return to where you started and close</dd>
+    </dl>
+  </div>
+
+  <h2 data-i18n="obLimitsTitle">Good to know</h2>
+  <ul>
+    <li data-i18n="obLimit1">Excel files opened in Sheets (.xlsx) have no API data: references and jumps work, values show as —.</li>
+    <li data-i18n="obLimit2">OFFSET, INDEX and INDIRECT are resolved from literals and single-cell values; anything else is listed as unresolved, never dropped.</li>
+    <li data-i18n="obLimit3">If Ctrl+Shift+A is taken by another extension, rebind it in Chrome's shortcut settings.</li>
+  </ul>
+
+  <footer>
+    <button id="shortcuts" type="button" data-i18n="obShortcuts">Open shortcut settings</button>
+    <a id="privacy" href="https://dt-tb-labs.github.io/Scopion/privacy/" target="_blank" rel="noopener" data-i18n="obPrivacy">Privacy policy</a>
+    <a id="source" href="https://github.com/dT-Tb-labs/Scopion" target="_blank" rel="noopener" data-i18n="obSource">Source and support</a>
+  </footer>
+</main>
+<script src="onboarding.js"></script>
+</body>
+</html>

@@ -24,6 +24,12 @@ test('build renders manifest.json from the template and the local oauth file', (
     execFileSync('node', [path.join(ext, 'build.js'), tmp]);
     const m = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
     assert.equal(m.manifest_version, 3);
+    // Localised fields reach the rendered manifest as placeholders Chrome resolves from _locales.
+    assert.equal(m.default_locale, 'en');
+    assert.equal(m.name, '__MSG_appName__');
+    assert.equal(m.description, '__MSG_appDesc__');
+    assert.equal(m.action.default_title, '__MSG_actionTitle__');
+    assert.equal(m.commands['toggle-scopion'].description, '__MSG_cmdToggle__');
     assert.equal(m.oauth2.client_id, 'cid.apps.googleusercontent.com');
     assert.equal(m.key, 'MIIB');
     // Read/write: the one write is re-hiding sheets the walk had to unhide.
@@ -51,8 +57,9 @@ test('--pack zips only the shipping files, without the manifest key, plus key.pe
     const version = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.template.json'), 'utf8')).version;
     const zip = path.join(out, 'scopion-' + version + '.zip');
     const listed = execFileSync('unzip', ['-Z1', zip]).toString().trim().split('\n').sort();
-    assert.deepEqual(listed, ['adapter.js', 'audit.js', 'background.js', 'content.js', 'dom.js', 'icons/icon128.png', 'icons/icon16.png',
-      'icons/icon32.png', 'icons/icon48.png', 'key.pem', 'lib/formula.js', 'lib/trace.js', 'manifest.json', 'panel.js', 'state.js']);
+    assert.deepEqual(listed, ['_locales/en/messages.json', '_locales/ja/messages.json', 'adapter.js', 'audit.js', 'background.js', 'content.js', 'dom.js',
+      'icons/icon128.png', 'icons/icon16.png', 'icons/icon32.png', 'icons/icon48.png', 'key.pem', 'lib/formula.js', 'lib/trace.js', 'manifest.json',
+      'onboarding.html', 'onboarding.js', 'panel.js', 'state.js']);
     const m = JSON.parse(execFileSync('unzip', ['-p', zip, 'manifest.json']).toString());
     assert.equal(m.key, undefined);
     assert.equal(m.oauth2.client_id, 'cid.apps.googleusercontent.com');
@@ -64,6 +71,25 @@ test('--pack zips only the shipping files, without the manifest key, plus key.pe
     if (parked) fs.writeFileSync(manifestPath, parked);
     else fs.rmSync(manifestPath, { force: true });
   }
+});
+
+test('every __MSG__ the manifest and onboarding page use exists in both locales, and the locales agree', () => {
+  const read = (p) => JSON.parse(fs.readFileSync(path.join(ext, p), 'utf8'));
+  const en = read('_locales/en/messages.json'), ja = read('_locales/ja/messages.json');
+  assert.deepEqual(Object.keys(ja).sort(), Object.keys(en).sort());
+  const template = fs.readFileSync(path.join(ext, 'manifest.template.json'), 'utf8');
+  const used = new Set([...template.matchAll(/__MSG_(\w+)__/g)].map((m) => m[1]));
+  const page = fs.readFileSync(path.join(ext, 'onboarding.html'), 'utf8');
+  for (const m of page.matchAll(/data-i18n="(\w+)"/g)) used.add(m[1]);
+  assert.ok(used.size >= 8, 'template and page should reference locale keys');
+  for (const key of used) {
+    assert.ok(en[key] && en[key].message, 'en missing ' + key);
+    assert.ok(ja[key] && ja[key].message, 'ja missing ' + key);
+  }
+  assert.equal(JSON.parse(template).default_locale, 'en');
+  // The store's summary field and the manifest description share the 132-character limit.
+  assert.ok(en.appDesc.message.length <= 132, 'en description over 132: ' + en.appDesc.message.length);
+  assert.ok(ja.appDesc.message.length <= 132, 'ja description over 132: ' + ja.appDesc.message.length);
 });
 
 test('build refuses to render a manifest without credentials', () => {

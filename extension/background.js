@@ -24,6 +24,19 @@ function rehideBody(sheetIds) {
   }) };
 }
 
+/**
+ * Where a toolbar click goes when no content script answers: the onboarding
+ * page. tab.url is populated only for hosts the extension has permission for,
+ * so a spreadsheet URL here means "Sheets tab opened before the install, not
+ * yet reloaded" and the page shows its reload hint; undefined means any other site.
+ */
+function onboardingUrlFor(tab) {
+  var url = tab && tab.url ? String(tab.url) : '';
+  // A document URL only (/d/<id>): the Sheets home page also matches the content-script
+  // pattern but has nothing to reload into.
+  return 'onboarding.html' + (/^https:\/\/docs\.google\.com\/spreadsheets\/(?:u\/\d+\/)?d\//.test(url) ? '#reload' : '');
+}
+
 /** Authorised fetch with a cached token; on 401 drop the token and retry once interactively. */
 function apiCall(url, init, deps) {
   function call(token) {
@@ -85,13 +98,28 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
   });
 
   // The shortcut and the toolbar icon are two doors to the same room: a user
-  // whose key is taken by another extension still has the icon.
-  function sendToggle(tab) {
+  // whose key is taken by another extension still has the icon. A click that
+  // reaches no content script opens the onboarding page instead of doing
+  // nothing; the shortcut stays silent there (an accidental chord on another
+  // site should not open a tab).
+  function openOnboarding(tab) {
+    chrome.tabs.create({ url: chrome.runtime.getURL(onboardingUrlFor(tab)) });
+  }
+  // "No content script" is decided by the reply, not by lastError alone: the
+  // content script answers {ok:true} synchronously, so an absent reply means
+  // nobody was listening (lastError is read so Chrome does not log it unchecked).
+  function sendToggle(tab, onNoReceiver) {
     if (!tab || tab.id === undefined) return;
-    chrome.tabs.sendMessage(tab.id, { type: 'scopion:toggle' }, function () { void chrome.runtime.lastError; });
+    chrome.tabs.sendMessage(tab.id, { type: 'scopion:toggle' }, function (reply) {
+      void chrome.runtime.lastError;
+      if (!reply && onNoReceiver) onNoReceiver(tab);
+    });
   }
   chrome.commands.onCommand.addListener(function (command, tab) {
-    if (command === 'toggle-scopion') sendToggle(tab);
+    if (command === 'toggle-scopion') sendToggle(tab, null);
   });
-  chrome.action.onClicked.addListener(sendToggle);
+  chrome.action.onClicked.addListener(function (tab) { sendToggle(tab, openOnboarding); });
+  chrome.runtime.onInstalled.addListener(function (details) {
+    if (details && details.reason === 'install') openOnboarding(null);
+  });
 }

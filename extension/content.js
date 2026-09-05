@@ -328,8 +328,11 @@
       if (missing.length) { S.panel.open(null, S.savedPos); S.panel.render(view()); S.panel.notice('Sheets layout changed; missing ' + missing.join(', ')); return; }
       if (!S.panel.isOpen()) open(); else newOrigin();
     }
-    chrome.runtime.onMessage.addListener(function (msg) {
-      if (msg && msg.type === 'scopion:toggle') toggle();
+    chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+      if (msg && msg.type === 'scopion:toggle') {
+        toggle();
+        sendResponse({ ok: true }); // background.js reads "no response" as "no content script here"
+      }
     });
     // Same door for page-side tooling (the smoke harness cannot press the
     // real shortcut): document.dispatchEvent(new CustomEvent('scopion:toggle')).

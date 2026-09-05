@@ -1,0 +1,6 @@
+title: Scopion
+description: Formula precedent tracer for Google Sheets
+theme: jekyll-theme-minimal
+exclude:
+  - superpowers
+  - store

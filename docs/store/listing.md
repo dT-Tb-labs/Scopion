@@ -5,34 +5,52 @@ Facts here must match `extension/manifest.template.json`; change both together.
 
 ## Package
 
-- Build: `node extension/build.js --pack --pem extension/scopion.pem` (first
-  upload; later uploads without `--pem`). The zip has no `key` field, no
+- Build: `node extension/build.js --pack`. The zip has no `key` field, no
   credentials, no tests.
-- Extension ID must stay `ihjnpijodijcbigekdihoamchmkgdgie` — the OAuth client
-  (GCP project 839296398878, type "Chrome Extension") is bound to it. After
-  the first upload, compare the Item ID in the dashboard with that value
-  before doing anything else. If they differ, update the OAuth client's Item
-  ID instead of publishing.
+- The OAuth client (GCP project 839296398878, type "Chrome Extension") is
+  bound to the unpacked ID `ihjnpijodijcbigekdihoamchmkgdgie`. The store
+  assigns its own signing key, so the Item ID it shows after the first upload
+  may differ: **compare, and if it differs, set the OAuth client's Item ID to
+  the store's** (one field; the unpacked development copy then needs its own
+  client or a second Item ID entry). Do not publish until the two match.
+  `--pem extension/scopion.pem` would copy the private key into the zip as
+  `key.pem` to try to keep the ID; that hands Google the signing key on an
+  undocumented promise, so it is not the default (review finding, round 1).
 
 ## Store listing
 
-- **Name:** Scopion
-- **Summary (≤132 chars):** the manifest `description`.
-- **Category:** Productivity → Tools. **Language:** English.
-- **Detailed description:** what it does (precedent trace for the selected
-  cell, arrow-key walk with the selection following, cross-sheet and hidden
-  sheets, breadcrumbs, IMPORTRANGE rows), the shortcut, and that the only
-  write is re-hiding sheets it unhid. Do not mention competitors or Google
-  trademarks in a way that implies endorsement ("for Google Sheets" is fine).
-- **Images** (all PNG, taken from the live panel on a real model):
+- **Name:** Scopion (manifest `__MSG_appName__`; the manifest has
+  `default_locale: en` and `_locales/{en,ja}`, so the dashboard offers one
+  listing per language — fill **both** English and Japanese).
+- **Summary (≤132 chars) and detailed description:** paste from
+  `listing.en.md` / `listing.ja.md` (plain text; `extension/test/listing.test.js`
+  checks the limits and that the summary equals the manifest description).
+- **Category:** Productivity → Tools. **Default language:** English.
+- **Version:** 1.0.0 for the first public upload (decided 2026-09-05: the walk
+  is user-verified live, and a 0.x on a public listing reads as beta). The
+  listing text names no other product by name; "Excel" appears only as the
+  platform the original tool ran on.
+- **Images** (PNG, in `docs/store/assets/`; the test checks the sizes):
   - Store icon: from the manifest 128 icon (96×96 artwork, 16 px padding) —
-    already rendered by `extension/icons/render.swift`.
-  - Screenshots: 1–5 at 1280×800, full bleed, no padding.
-  - Small promo tile: 440×280 (required for featured placement).
-  - Marquee 1400×560: optional.
-- **Homepage / support URL:** the repository. **Privacy policy URL:** a public
-  page serving `docs/store/PRIVACY.md` (the same URL goes on the OAuth
-  consent screen).
+    rendered by `extension/icons/render.swift`.
+  - Screenshots `screenshot-1..N.png`: 1280×800, full bleed, real captures of
+    the panel on the test spreadsheet (`sh docs/store/capture.sh N X Y` grabs
+    the 1280×800 viewport region of the screen and resamples the Retina
+    capture). **Status 2026-09-05:** only `screenshot-1.png` exists (origin
+    row, INDEX/MATCH); its Sheets UI is Japanese and it shows the account
+    avatar and the mouse cursor. Before upload: retake with `?hl=en` on the
+    sheet URL for the EN listing (and `?hl=ja` for JA), mouse off-screen, and
+    add the cross-sheet walk, hidden-sheet flag and breadcrumb shots.
+  - Small promo tile `promo-440x280.png`: icon + tagline, no screenshot;
+    source `promo-tile.html`, rendered at a 440×280 viewport.
+  - Marquee 1400×560: not made; add later if wanted.
+- **Homepage:** `https://dt-tb-labs.github.io/Scopion/` (GitHub Pages of this
+  repo, source folder `docs/`, Jekyll minimal theme; `superpowers/` and `store/`
+  excluded). **Support URL:** `https://github.com/dT-Tb-labs/Scopion/issues`.
+  **Privacy policy URL:** `https://dt-tb-labs.github.io/Scopion/privacy/`
+  (`docs/privacy.md`). The same two URLs go on the OAuth consent screen; the
+  domain to verify in Search Console is `dt-tb-labs.github.io` (URL-prefix
+  property, HTML-file method — the file goes in `docs/`).
 
 ## Privacy practices tab
 
@@ -76,3 +94,22 @@ Test account not needed — any Google account with a spreadsheet works. Steps:
 open a spreadsheet, select a cell containing a formula, press Ctrl+Shift+A
 (or click the toolbar icon), accept the Google sign-in, use ↑↓ to walk, → to
 drill into a cell, ← to go back, Esc to return to the start and close.
+On install the extension opens its bundled `onboarding.html` once
+(`chrome.runtime.onInstalled`, reason `install` only); clicking the toolbar
+icon on a tab that is not a spreadsheet opens the same page. No new
+permissions are involved.
+
+## First-upload order
+
+1. Push the repo to GitHub (public), enable Pages from `main` / `docs`, and
+   confirm the two URLs above resolve. The Jekyll site has never been built
+   locally: check on the first deploy that the minimal theme's `default`
+   layout applies, `/Scopion/privacy/` renders, and nothing from
+   `docs/superpowers` or `docs/store` is published.
+2. Verify `dt-tb-labs.github.io` in Search Console; set the OAuth consent
+   screen to In production with the homepage, privacy URL and logo; submit
+   for verification (see above).
+3. `node extension/build.js --pack`, upload the zip, compare the Item ID with
+   the OAuth client (fix the client if they differ), fill both language
+   listings, upload the images, answer the privacy practices tab, submit for
+   review.

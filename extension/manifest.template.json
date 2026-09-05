@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Scopion",
-  "version": "0.1.0",
-  "description": "Trace a formula's inputs in Google Sheets: Ctrl+Shift+A, walk the referenced cells with ↑↓, across sheets. For financial models.",
+  "name": "__MSG_appName__",
+  "version": "1.0.0",
+  "description": "__MSG_appDesc__",
+  "default_locale": "en",
   "key": "",
   "permissions": ["identity", "storage"],
   "host_permissions": ["https://docs.google.com/spreadsheets/*", "https://sheets.googleapis.com/*"],
   "background": { "service_worker": "background.js" },
   "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "action": {
-    "default_title": "Scopion — open on the selected cell (Ctrl+Shift+A)",
+    "default_title": "__MSG_actionTitle__",
     "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
   },
   "content_scripts": [
@@ -22,7 +23,7 @@
   "commands": {
     "toggle-scopion": {
       "suggested_key": { "default": "Ctrl+Shift+A", "mac": "Ctrl+Shift+A" },
-      "description": "Open Scopion on the selected cell (re-audit when already open)"
+      "description": "__MSG_cmdToggle__"
     }
   },
   "oauth2": {
