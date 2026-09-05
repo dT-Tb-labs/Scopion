@@ -125,7 +125,8 @@ var SheetsDom = {
   jump: function (sheetName, a1) {
     var nb = document.querySelector(SHEETS_SEL.nameBox);
     if (!nb) return Promise.reject(new Error('Sheets name box not found'));
-    var target = quoteSheetName(sheetName) + '!' + a1;
+    // No sheet name = a named range: the name box takes the bare name.
+    var target = sheetName ? quoteSheetName(sheetName) + '!' + a1 : a1;
     // A range address ("B1:B3") lands with its top-left cell in the name box's parse.
     var targetA1 = topLeftA1(a1).toUpperCase();
     nb.focus();

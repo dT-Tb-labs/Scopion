@@ -63,6 +63,7 @@ function unknownNamesIn(formula, namedRanges) {
 }
 
 function fetchRects(api, snap, rects) {
+  if (snap.dataless) return Promise.resolve(); // nothing to fetch from: the API refused this document
   var todo = rects.filter(function (r) { return !snap.isFetched(r); });
   if (!todo.length) return Promise.resolve();
   return api.getGrid(todo.map(function (r) { return apiRange(snap, r); })).then(function (resp) {
@@ -83,6 +84,8 @@ function auditCell(api, snap, sheetName, a1, formula, settings) {
   if (!box) return Promise.reject(new Error('Not a valid reference: ' + a1));
   a1 = numToCol(box.c1) + box.r1; // a selection audits its top-left cell
   formula = formula && String(formula).charAt(0) === '=' ? String(formula) : '';
+  // Without cell data the formula bar is the only source of the origin formula.
+  if (snap.dataless) snap.getSheetByName(sheetName).put(box.r1, box.c1, { v: '', d: '', f: formula });
 
   return fetchRects(api, snap, rectsToFetch(formula, sheetName, a1, snap, namedRanges))
     .then(function () {
@@ -97,6 +100,16 @@ function auditCell(api, snap, sheetName, a1, formula, settings) {
         // pre-fetch blanks, or a whole-grid snapshot taken before the dynamic
         // targets arrived, and either would print a stale value here.
         var rows = buildRows(snap, found.targets, new ValueCache(snap), settings);
+        if (snap.dataless) {
+          // No values to show, so no blank alarms either; and a name the
+          // snapshot cannot resolve is still a place the name box can jump to.
+          rows.forEach(function (r) { if (!r.external && r.flag !== '?') { r.value = '—'; r.isBlank = false; } });
+          unknownNamesIn(formula, namedRanges).forEach(function (name) {
+            if (/^(TRUE|FALSE)$/i.test(name)) return; // literals tokenise like names
+            rows.push({ pos: 0, external: false, sheetName: '', flag: '', address: name, value: '—',
+              subFormula: name, viaName: name, dynamic: false, isBlank: false, jumpable: true });
+          });
+        }
         return {
           origin: {
             sheetName: sheetName,
@@ -111,7 +124,8 @@ function auditCell(api, snap, sheetName, a1, formula, settings) {
           hasBlank: rows.some(function (r) { return r.isBlank; }),
           // From the formula the page showed us, not the snapshot's: the caller
           // refreshes metadata on a miss, and the page is what the user is looking at.
-          unknownNames: unknownNamesIn(formula, namedRanges)
+          unknownNames: snap.dataless ? [] : unknownNamesIn(formula, namedRanges),
+          dataless: !!snap.dataless
         };
       });
     });
@@ -124,14 +138,14 @@ function buildRows(snap, targets, cache, settings) {
     var t = targets[i];
     if (t.external) {
       if (!settings.showExternal) continue;
-      rows.push({ external: true, sheetName: '(external)', flag: 'EX', address: t.a1, value: '',
+      rows.push({ pos: t.pos || 0, external: true, sheetName: '(external)', flag: 'EX', address: t.a1, value: '',
         subFormula: t.raw || '', viaName: '', dynamic: false, url: safeUrl(t.url), isBlank: false, jumpable: false });
       continue;
     }
     var rct = t.rect;
     var sheet = snap.getSheetByName(rct.sheetName);
     if (!sheet) {
-      rows.push({ external: false, sheetName: rct.sheetName, flag: '?', address: rectToA1(rct), value: '(sheet not found)',
+      rows.push({ pos: t.pos || 0, external: false, sheetName: rct.sheetName, flag: '?', address: rectToA1(rct), value: '(sheet not found)',
         subFormula: t.raw || '', viaName: '', dynamic: !!t.dynamic, isBlank: false, jumpable: false });
       continue;
     }
@@ -141,7 +155,7 @@ function buildRows(snap, targets, cache, settings) {
     if (rct.r1 > sheet.getMaxRows() || rct.c1 > sheet.getMaxColumns()) {
       // Past the grid there is nothing to read — and an empty referenced range is
       // exactly the modelling error the blank alert exists for.
-      rows.push({ external: false, sheetName: sheet.getName(), flag: flag, address: rectToA1(rct), value: BLANK_LABEL,
+      rows.push({ pos: t.pos || 0, external: false, sheetName: sheet.getName(), flag: flag, address: rectToA1(rct), value: BLANK_LABEL,
         subFormula: t.raw || '', viaName: t.viaName || '', dynamic: !!t.dynamic, isBlank: true, jumpable: false });
       continue;
     }
@@ -149,6 +163,7 @@ function buildRows(snap, targets, cache, settings) {
     // "Blank" means structurally empty. A formula returning "" is not a missing input.
     var isBlank = !isRange && cell.d === '' && cell.f === '';
     rows.push({
+      pos: t.pos || 0, // where the reference sits in the formula, for the panel's colour link
       external: false, sheetName: sheet.getName(), flag: flag, address: rectToA1(rct),
       value: isBlank ? BLANK_LABEL : (isRange ? rangeTotal(cache, rct) : cell.d),
       subFormula: t.raw || '', viaName: t.viaName || '', dynamic: !!t.dynamic,

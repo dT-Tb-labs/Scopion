@@ -54,6 +54,15 @@
     if (S.snap && !force) return Promise.resolve(S.snap);
     return rpc({ type: 'scopion:meta', spreadsheetId: S.spreadsheetId }).then(function (meta) {
       S.snap = new Snapshot(meta);
+      S.apiError = '';
+      return S.snap;
+    }, function (e) {
+      // The Sheets API refuses non-native documents (an .xlsx opened in Sheets)
+      // and can fail for quota or auth reasons; the walk still works from the
+      // page alone, so degrade instead of dying. The notice says why.
+      trace('meta:error', String(e && e.message ? e.message : e));
+      S.apiError = String(e && e.message ? e.message : e);
+      S.snap = Snapshot.fromTabs(SheetsDom.sheetTabs());
       return S.snap;
     });
   }
@@ -71,9 +80,11 @@
   function view(extra) {
     var w = S.walk;
     return Object.assign({
-      originFormula: w ? w.originFormula : '', names: w ? w.names : [], rows: w ? w.rows : [], active: w ? w.active : -1,
+      originFormula: w ? w.originFormula : '', originSheet: w ? w.origin.sheetName : '',
+      names: w ? w.names : [], rows: w ? w.rows : [], active: w ? w.active : -1,
       hasBlank: w ? w.hasBlank : false, unresolved: w ? w.unresolved : [], canBack: !!(w && w.history.length),
-      advanced: S.advanced, settings: S.settings, busy: S.busy, unhidden: S.unhidden
+      advanced: S.advanced, settings: S.settings, busy: S.busy, unhidden: S.unhidden,
+      dataless: !!(S.snap && S.snap.dataless), apiError: S.apiError || ''
     }, extra || {});
   }
   function render() { S.panel.render(view()); }
@@ -158,7 +169,7 @@
         S.lastJump = { sheetName: res.origin.sheetName, a1: res.origin.a1 };
         S.unhidden = [];
         setBusy(false);
-        S.panel.open(SheetsDom.cellRect(), S.savedPos);
+        S.panel.open(SheetsDom.selectionRect(), S.savedPos);
         render();
         paintHighlights();
         S.panel.focus();
@@ -167,7 +178,7 @@
       });
     }).catch(function (e) {
       // A failure before the strip is up must still be visible somewhere.
-      if (!S.panel.isOpen()) { S.panel.open(SheetsDom.cellRect(), S.savedPos); S.panel.render(view()); }
+      if (!S.panel.isOpen()) { S.panel.open(SheetsDom.selectionRect(), S.savedPos); S.panel.render(view()); }
       fail(e);
     });
   }
@@ -181,7 +192,15 @@
     if (!row.jumpable) return;
     setBusy(true);
     resync().then(function () { return jump({ sheetName: row.sheetName, a1: topLeftA1(row.address), address: row.address }); })
-      .then(function () { setBusy(false); }).catch(fail);
+      .then(function () {
+        // Without API data, a visited constant cell still shows its value in the formula bar.
+        if (S.snap && S.snap.dataless && S.walk && S.walk.rows[index] === row) {
+          var bar = document.querySelector(SHEETS_SEL.formulaBar);
+          var text = bar ? bar.textContent : '';
+          if (text && text.charAt(0) !== '=' && !row.isOrigin) row.value = text;
+        }
+        setBusy(false);
+      }).catch(fail);
   }
 
   /** New Origin / Enter: audit the cell the walk is standing on. */

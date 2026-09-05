@@ -56,6 +56,21 @@ function Snapshot(meta) {
     this.named.push(new SnapNamedRange(nr.name, new SnapRange(sheet, r1, c1, r2 - r1 + 1, c2 - c1 + 1)));
   }
 }
+/**
+ * A snapshot with no cell data at all, built from the sheet tabs in the page.
+ * Used when the Sheets API refuses the document (an .xlsx opened in Sheets):
+ * the walk still works from the formula bar and the name box; values do not.
+ * tabs: [{name, hidden}] in tab order.
+ */
+Snapshot.fromTabs = function (tabs) {
+  var snap = new Snapshot({
+    sheets: (tabs || []).map(function (t, i) {
+      return { properties: { sheetId: i, title: t.name, hidden: !!t.hidden, gridProperties: { rowCount: 1000, columnCount: 26 } } };
+    })
+  });
+  snap.dataless = true;
+  return snap;
+};
 Snapshot.prototype.getSheets = function () { return this.sheets; };
 Snapshot.prototype.getSheetByName = function (name) { return this.byName[name] || null; };
 Snapshot.prototype.getNamedRanges = function () { return this.named; };

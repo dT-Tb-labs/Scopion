@@ -1,38 +1,69 @@
 /**
- * panel.js — the ACE window (frmACE), rebuilt: a modeless strip you can drag,
- * a multi-column list of precedents on the left, the origin formula and the
- * range names on the right, OK/Back/New Origin/Advanced along the bottom.
- * Shadow DOM keeps Sheets' CSS out and ours in. No framework: the list is
- * small and re-rendered whole.
+ * panel.js — the ACE window (frmACE), rebuilt as a liquid-glass strip: a
+ * modeless, draggable pane that blurs the grid behind it, a multi-column list
+ * of precedents on the left, the origin formula and the range names on the
+ * right, OK/Back/New Origin/Advanced along the bottom. Shadow DOM keeps
+ * Sheets' CSS out and ours in. No framework: the list is small and
+ * re-rendered whole.
+ *
+ * Reading aids: every reference row gets a colour, and the same colour marks
+ * that reference inside the origin formula; rows on another sheet than the
+ * origin are bold, rows on the same sheet are dimmed.
  */
 var PANEL_CSS = [
   ':host{all:initial}',
-  '.win{position:fixed;z-index:2147483000;width:910px;background:#f0f0f0;border:1px solid #6d6d6d;box-shadow:0 6px 24px rgba(0,0,0,.35);',
-  '  font:11px Tahoma,"Segoe UI",system-ui,sans-serif;color:#000;user-select:none}',
-  '.title{height:22px;line-height:22px;padding:0 8px;background:linear-gradient(#fdfdfd,#dcdcdc);border-bottom:1px solid #a0a0a0;cursor:move;display:flex;justify-content:space-between}',
-  '.title .x{cursor:pointer;padding:0 6px}.title .x:hover{background:#c42b1c;color:#fff}',
-  '.body{position:relative;height:88px}.body.adv{height:129px}',
-  '.list{position:absolute;left:0;top:0;width:467px;height:82px;overflow-y:auto;background:#fff;border:1px inset #999;outline:none}',
-  '.list.blank{background:#ffff99}.list.unfocused .row.on{background:#d9d9d9;color:#000}',
-  '.row{display:grid;height:16px;line-height:16px;white-space:nowrap;cursor:default}',
-  '.row>span{overflow:hidden;text-overflow:ellipsis;padding:0 3px}.row .v{text-align:right;font-variant-numeric:tabular-nums}',
-  '.row.on{background:#0078d7;color:#fff}.row.ext{color:#5a3d8a}.row .flag{text-align:center}.row.is-origin{font-weight:bold}',
-  '.origin{position:absolute;left:473px;top:0;width:430px;height:60px;background:#fff;border:1px inset #999;padding:2px 4px;overflow:auto;white-space:pre-wrap;word-break:break-all;font-family:Consolas,Menlo,monospace}',
-  '.names{position:absolute;left:473px;top:64px;width:350px;height:18px;background:#fff;border:1px inset #999;padding:0 4px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-  'button{position:absolute;height:22px;padding:0 8px;font:inherit;background:linear-gradient(#fff,#e1e1e1);border:1px solid #707070;border-radius:2px;cursor:pointer}',
-  'button:disabled{color:#888;cursor:default}button:focus{outline:1px dotted #000}',
-  '.ok{left:832px;top:62px;width:70px}.adv-row{position:absolute;top:100px;left:0;right:0;height:26px;display:none}.body.adv .adv-row{display:block}',
-  '.adv-row label{position:absolute;top:5px;white-space:nowrap}.adv-row input{vertical-align:-2px}',
-  '.back{left:632px;top:100px;width:70px}.advbtn{left:744px;top:100px;width:80px}.neworigin{left:832px;top:100px;width:70px}',
-  '.body:not(.adv) .back,.body:not(.adv) .advbtn,.body:not(.adv) .neworigin{top:64px;display:none}',
-  '.notice{position:absolute;left:473px;top:84px;width:350px;color:#8a4b00;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+  '.win{position:fixed;z-index:2147483000;width:910px;border-radius:14px;box-sizing:border-box;',
+  '  background:rgba(250,251,255,.66);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);',
+  '  box-shadow:0 18px 50px rgba(20,30,60,.28),0 2px 8px rgba(20,30,60,.10),inset 0 1px 0 rgba(255,255,255,.95),inset 0 0 0 1px rgba(255,255,255,.45),0 0 0 1px rgba(30,40,80,.12);',
+  '  font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#1c2333;user-select:none;',
+  '  animation:scopion-pop .16s ease-out}',
+  '@keyframes scopion-pop{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}',
+  '.title{height:30px;line-height:30px;padding:0 10px 0 12px;cursor:move;display:flex;align-items:center;justify-content:space-between;',
+  '  border-bottom:1px solid rgba(30,40,80,.08);font-weight:600;letter-spacing:.01em}',
+  '.title .name{display:flex;align-items:center;gap:7px}.title .mark{width:14px;height:14px;border-radius:4px;background:linear-gradient(135deg,#1c2a6b,#070b24);position:relative}',
+  '.title .mark::after{content:"";position:absolute;left:4px;top:4px;width:4px;height:4px;border-radius:50%;background:#ffd28a;box-shadow:5px 3px 0 -1px #f7d774,-2px 5px 0 -1.5px #f7d774}',
+  '.title .x{width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;cursor:pointer;color:#3a4460;',
+  '  background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px rgba(30,40,80,.12);transition:background .12s,transform .08s}',
+  '.title .x:hover{background:#ff5f57;color:#fff}.title .x:active{transform:scale(.94)}',
+  '.body{position:relative;height:100px}.body.adv{height:140px}',
+  '.pane{background:rgba(255,255,255,.42);border-radius:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 0 0 1px rgba(30,40,80,.10)}',
+  '.list{position:absolute;left:8px;top:6px;width:459px;height:88px;overflow-y:auto;outline:none;padding:3px}',
+  '.list.blank{background:rgba(255,214,0,.28)}',
+  '.row{display:grid;height:20px;line-height:20px;white-space:nowrap;cursor:default;border-radius:7px;transition:background .12s,box-shadow .12s}',
+  '.row>span{overflow:hidden;text-overflow:ellipsis;padding:0 4px}.row .v{text-align:right;font-variant-numeric:tabular-nums}',
+  '.row .flag{text-align:center;font-size:10px;color:#7a2e00}',
+  '.row .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 6px 0 0;vertical-align:-1px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}',
+  '.row.same .sheet{opacity:.5}.row.x .sheet{font-weight:700}.row.ext{color:#5a3d8a}.row.is-origin{font-weight:700}',
+  '.row.on{background:linear-gradient(180deg,rgba(84,132,255,.30),rgba(84,132,255,.18));box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 0 1px rgba(84,132,255,.45);color:#0b2a6b}',
+  '.list.unfocused .row.on{background:rgba(30,40,80,.10);color:#1c2333;box-shadow:0 0 0 1px rgba(30,40,80,.16)}',
+  '.row:hover:not(.on){background:rgba(255,255,255,.55)}',
+  '.origin{position:absolute;left:475px;top:6px;width:427px;height:60px;padding:5px 8px;overflow:auto;white-space:pre-wrap;word-break:break-all;box-sizing:border-box;',
+  '  font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.45}',
+  '.origin .lbl{color:#5b6580;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:10px;letter-spacing:.06em;margin-right:6px}',
+  '.tok{border-radius:4px;padding:0 3px;font-weight:600}',
+  '.names{position:absolute;left:475px;top:70px;width:340px;height:24px;line-height:24px;padding:0 8px;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#3a4460}',
+  '.names .lbl{color:#5b6580;font-weight:600;font-size:10px;letter-spacing:.06em;margin-right:6px}',
+  'button{position:absolute;height:24px;padding:0 12px;font:inherit;font-weight:600;color:#1c2333;cursor:pointer;border:0;border-radius:999px;',
+  '  background:rgba(255,255,255,.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px rgba(30,40,80,.14),0 1px 2px rgba(20,30,60,.08);transition:background .12s,transform .08s}',
+  'button:hover{background:rgba(255,255,255,.9)}button:active{transform:scale(.97)}button:disabled{opacity:.45;cursor:default}',
+  'button:focus-visible{outline:2px solid rgba(84,132,255,.7);outline-offset:1px}',
+  '.ok{left:822px;top:70px;width:80px;color:#fff;background:linear-gradient(180deg,#5c8cff,#3b6cf0);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 2px 6px rgba(59,108,240,.35)}',
+  '.ok:hover{background:linear-gradient(180deg,#6b97ff,#4576f5)}',
+  '.adv-row{position:absolute;top:104px;left:8px;right:8px;height:30px;display:none}.body.adv .adv-row{display:block}',
+  '.adv-row label{position:absolute;top:6px;white-space:nowrap;color:#3a4460}.adv-row input{vertical-align:-2px;accent-color:#3b6cf0}',
+  '.back{left:610px;top:106px;width:72px}.advbtn{left:704px;top:106px;width:96px}.neworigin{left:812px;top:106px;width:90px}',
+  '.body:not(.adv) .back,.body:not(.adv) .advbtn,.body:not(.adv) .neworigin{display:none}',
+  '.notice{position:absolute;left:475px;top:96px;width:340px;color:#8a4b00;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+  '.body.adv .notice{top:136px}',
   '.busy .list{opacity:.6}',
-  '.hl{position:fixed;z-index:2147482999;pointer-events:none;box-sizing:border-box}',
-  '.hl.walk{background:rgba(0,176,80,.28);border:2px solid #00b050}.hl.origin{border:2px dashed #00b050}'
+  '.hl{position:fixed;z-index:2147482999;pointer-events:none;box-sizing:border-box;border-radius:3px;transition:left .12s,top .12s,width .12s,height .12s}',
+  '.hl.walk{background:rgba(255,178,96,.22);border:2px solid #e39a3b;box-shadow:0 0 0 3px rgba(227,154,59,.18)}',
+  '.hl.origin{border:2px dashed #e39a3b}'
 ].join('\n');
 
-var COLS_BASIC = [200, 0, 120, 147, 0];
-var COLS_FULL = [147, 27, 80, 107, 107];
+var COLS_BASIC = [200, 0, 120, 133, 0];
+var COLS_FULL = [147, 27, 80, 107, 92];
+var TOKEN_COLORS = ['#e4572e', '#2b6fdb', '#1f9d55', '#8e44ad', '#e67e22', '#0e9aa7', '#d63384', '#7a5c2e'];
 
 function createPanel(handlers) {
   var host = document.createElement('div');
@@ -46,17 +77,17 @@ function createPanel(handlers) {
   win.className = 'win';
   win.hidden = true;
   win.innerHTML =
-    '<div class="title"><span>Scopion — Active Cell Explorer</span><span class="x" title="OK (Esc)">✕</span></div>' +
+    '<div class="title"><span class="name"><span class="mark"></span>Scopion</span><span class="x" title="OK (Esc)">✕</span></div>' +
     '<div class="body">' +
-      '<div class="list" tabindex="0" role="listbox" aria-label="Precedents"></div>' +
-      '<div class="origin"></div>' +
-      '<div class="names"></div>' +
+      '<div class="list pane" tabindex="0" role="listbox" aria-label="Precedents"></div>' +
+      '<div class="origin pane"></div>' +
+      '<div class="names pane"></div>' +
       '<div class="notice"></div>' +
       '<button class="ok">OK</button>' +
       '<div class="adv-row">' +
-        '<label style="left:8px"><input type="checkbox" data-key="showExternal"> Display Workbook information</label>' +
-        '<label style="left:224px"><input type="checkbox" data-key="showNames"> Display Range Name</label>' +
-        '<label style="left:408px"><input type="checkbox" data-key="includeHidden"> Include Hidden Sheets</label>' +
+        '<label style="left:4px"><input type="checkbox" data-key="showExternal"> Display Workbook information</label>' +
+        '<label style="left:220px"><input type="checkbox" data-key="showNames"> Display Range Name</label>' +
+        '<label style="left:404px"><input type="checkbox" data-key="includeHidden"> Include Hidden Sheets</label>' +
       '</div>' +
       '<button class="back">Back</button>' +
       '<button class="advbtn">Advanced</button>' +
@@ -75,7 +106,43 @@ function createPanel(handlers) {
 
   function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
-  function renderList() {
+  /** Reference rows get a colour each; the origin row has none. */
+  function rowColors(rows) {
+    var k = 0;
+    return rows.map(function (r) { return r.isOrigin ? null : TOKEN_COLORS[k++ % TOKEN_COLORS.length]; });
+  }
+
+  /**
+   * The origin formula with each reference wrapped in its row's colour.
+   * Trace.gs positions index the formula without its leading "=", and a
+   * sheet-qualified ref's position points at the cell part, so the raw text
+   * is searched for just before that position. A dynamic call (OFFSET(...))
+   * colours only its function name — its argument refs are rows of their own.
+   */
+  function formulaHtml(formula, rows, colors) {
+    var body = formula.charAt(0) === '=' ? formula.slice(1) : formula;
+    var marks = [];
+    rows.forEach(function (r, i) {
+      if (r.isOrigin || !r.subFormula || !colors[i]) return;
+      var raw = r.subFormula;
+      var len = r.dynamic && raw.indexOf('(') > 0 ? raw.indexOf('(') : raw.length;
+      var idx = body.indexOf(raw, Math.max(0, (r.pos || 0) - raw.length));
+      if (idx < 0) idx = body.indexOf(raw);
+      if (idx < 0) return;
+      marks.push({ start: idx, end: idx + len, color: colors[i] });
+    });
+    marks.sort(function (a, b) { return a.start - b.start; });
+    var out = '', cursor = 0;
+    marks.forEach(function (m) {
+      if (m.start < cursor) return; // overlapping the previous mark: keep the earlier one
+      out += esc(body.slice(cursor, m.start)) +
+        '<span class="tok" style="background:' + m.color + '22;color:' + m.color + '">' + esc(body.slice(m.start, m.end)) + '</span>';
+      cursor = m.end;
+    });
+    return (formula.charAt(0) === '=' ? '=' : '') + out + esc(body.slice(cursor));
+  }
+
+  function renderList(colors) {
     var rows = view.rows || [];
     var anyFlag = rows.some(function (r) { return r.flag; });
     var anyDyn = rows.some(function (r) { return r.dynamic || r.external; });
@@ -87,13 +154,16 @@ function createPanel(handlers) {
       esc(view.originFormula ? 'No references found.' : 'Not a formula cell.') + '</span></div>';
     rows.forEach(function (r, i) {
       var el = document.createElement('div');
-      el.className = 'row' + (i === view.active ? ' on' : '') + (r.external ? ' ext' : '') + (r.isOrigin ? ' is-origin' : '');
+      var sameSheet = !r.external && r.sheetName === view.originSheet;
+      el.className = 'row' + (i === view.active ? ' on' : '') + (r.external ? ' ext' : '') +
+        (r.isOrigin ? ' is-origin' : (sameSheet ? ' same' : ' x'));
       el.style.gridTemplateColumns = tpl;
       el.setAttribute('role', 'option');
       el.setAttribute('aria-selected', i === view.active ? 'true' : 'false');
       el.dataset.index = i;
+      var dot = colors[i] ? '<span class="dot" style="background:' + colors[i] + '"></span>' : '<span class="dot" style="background:#e39a3b"></span>';
       el.innerHTML =
-        '<span title="' + esc(r.sheetName) + '">' + esc(r.sheetName) + '</span>' +
+        '<span class="sheet" title="' + esc(r.sheetName) + '">' + dot + esc(r.sheetName) + '</span>' +
         '<span class="flag">' + esc(r.flag) + '</span>' +
         '<span>' + esc(r.address) + '</span>' +
         '<span class="v">' + esc(r.value) + '</span>' +
@@ -105,17 +175,19 @@ function createPanel(handlers) {
   }
 
   /**
-   * v: {originFormula, names, rows, active, hasBlank, unresolved, canBack,
-   *     advanced, settings, busy, unhidden}. unhidden is the list of sheet
-   * names Sheets unhid during this session's jumps — shown as part of the
-   * notice, since a side-channel notice() call gets overwritten by the next
-   * render() (every caller renders right after a jump).
+   * v: {originFormula, originSheet, names, rows, active, hasBlank, unresolved,
+   *     canBack, advanced, settings, busy, unhidden}. unhidden is the list of
+   * sheet names Sheets unhid during this session's jumps — shown as part of
+   * the notice, since a side-channel notice() call gets overwritten by the
+   * next render() (every caller renders right after a jump).
    */
   function render(v) {
     view = v;
     body.className = 'body' + (v.advanced ? ' adv' : '') + (v.busy ? ' busy' : '');
-    $('.origin').textContent = v.originFormula ? 'ORIGIN FORMULA: ' + v.originFormula : 'ORIGIN FORMULA: (not a formula)';
-    $('.names').textContent = v.names && v.names.length ? 'RANGE NAME: ' + v.names.join(' | ') : '';
+    var colors = rowColors(v.rows || []);
+    $('.origin').innerHTML = '<span class="lbl">ORIGIN FORMULA</span>' +
+      (v.originFormula ? formulaHtml(v.originFormula, v.rows || [], colors) : '<span style="color:#5b6580">(not a formula)</span>');
+    $('.names').innerHTML = v.names && v.names.length ? '<span class="lbl">RANGE NAME</span>' + esc(v.names.join(' | ')) : '';
     $('.back').disabled = !v.canBack;
     $('.advbtn').textContent = v.advanced ? 'Simple' : 'Advanced';
     ['showExternal', 'showNames', 'includeHidden'].forEach(function (k) {
@@ -126,19 +198,31 @@ function createPanel(handlers) {
         v.unresolved.map(function (u) { return u.raw + ' (' + u.reason + ')'; }).join('; ') : '';
     var unhiddenText = v.unhidden && v.unhidden.length ?
       'Sheets unhid: ' + v.unhidden.join(', ') + ' — re-hide by hand when done.' : '';
-    notice(unresolvedText && unhiddenText ? unresolvedText + ' · ' + unhiddenText : (unresolvedText || unhiddenText));
-    renderList();
+    var datalessText = v.dataless ? 'No cell data for this file (Excel format?) — references and jumps only.' : '';
+    notice([datalessText, unresolvedText, unhiddenText].filter(Boolean).join(' · '));
+    renderList(colors);
   }
 
   function notice(text) { $('.notice').textContent = text || ''; $('.notice').title = text || ''; }
 
+  function height() { return 30 + (view && view.advanced ? 140 : 100); }
+
   function place(p) {
-    var w = 910, h = view && view.advanced ? 151 : 110;
+    var w = 910, h = height();
     pos = { x: Math.max(0, Math.min(p.x, innerWidth - w)), y: Math.max(0, Math.min(p.y, innerHeight - h)) };
     win.style.left = pos.x + 'px'; win.style.top = pos.y + 'px';
   }
 
-  // Keyboard — the ACE ListBox: arrows walk (and jump), Enter is New Origin, Back is Backspace/←, Esc is OK.
+  /** Never cover the selection: to its right when that fits, else below, else above. */
+  function placeNear(r) {
+    var w = 910, h = height(), gap = 10;
+    if (r.x + r.w + gap + w <= innerWidth) place({ x: r.x + r.w + gap, y: r.y });
+    else if (r.y + r.h + gap + h <= innerHeight) place({ x: r.x, y: r.y + r.h + gap });
+    else if (r.y - gap - h >= 0) place({ x: r.x, y: r.y - gap - h });
+    else place({ x: r.x, y: innerHeight - h });
+  }
+
+  // Keyboard — the ACE ListBox: arrows walk (and jump), → drills in, ←/Backspace goes back, Enter stays, Esc returns.
   list.addEventListener('keydown', function (ev) {
     var k = ev.key;
     if (!view) return;
@@ -148,7 +232,6 @@ function createPanel(handlers) {
     else if (k === 'End') handlers.onWalk(view.rows.length - 1);
     else if (k === 'PageDown') handlers.onWalk(Math.min(view.rows.length - 1, view.active + 5));
     else if (k === 'PageUp') handlers.onWalk(Math.max(0, view.active - 5));
-    // Enter commits: close and stay on the cell you walked to. → drills in. Esc cancels back to the origin.
     else if (k === 'Enter') handlers.onCommit();
     else if (k === 'ArrowRight') handlers.onDrill();
     else if (k === 'Backspace' || k === 'ArrowLeft') handlers.onBack();
@@ -197,10 +280,11 @@ function createPanel(handlers) {
 
   return {
     isOpen: function () { return !win.hidden; },
+    /** Opens next to the selection rectangle (see placeNear); a saved position is used only when there is no rectangle. */
     open: function (nearRect, savedPos) {
       win.hidden = false;
-      if (savedPos) place(savedPos);
-      else if (nearRect) place({ x: nearRect.x, y: nearRect.y + nearRect.h + 8 });
+      if (nearRect) placeNear(nearRect);
+      else if (savedPos) place(savedPos);
       else place(pos);
     },
     close: function () { win.hidden = true; setHl(walkHl, null); setHl(originHl, null); notice(''); },

@@ -123,6 +123,21 @@ test('every jumpable row was actually fetched before it was built', async () => 
   }
 });
 
+test('without API data (an .xlsx in Sheets) the walk still lists static refs, dynamic literals and bare names', async () => {
+  const snap = S.Snapshot.fromTabs([{ name: 'Model', hidden: false }, { name: 'Hidden Calc', hidden: true }]);
+  const api = { getGrid: () => { throw new Error('must not be called'); } };
+  const res = await S.auditCell(api, snap, 'Model', 'A1', "=B1+'Hidden Calc'!A2+OFFSET(B1,2,0)+OFFSET(B1,C1,0)+Growth", { includeHidden: true });
+  // B1 is referenced twice but listed once (dedupeRefs); OFFSET(B1,2,0) resolves to B3 from literals alone.
+  assert.deepEqual(addrs(res), ['Model!B1', 'Hidden Calc!A2', 'Model!B3', 'Model!C1', '!Growth']);
+  assert.ok(res.rows.every((r) => r.value === '—' && !r.isBlank), 'no values, no blank alarms');
+  assert.equal(res.rows[4].jumpable, true, 'a bare name is a name-box jump');
+  assert.equal(res.rows[4].sheetName, '');
+  assert.equal(res.unresolved.length, 1, 'OFFSET needing a cell value stays unresolved');
+  assert.equal(res.origin.formula.startsWith('=B1+'), true);
+  assert.equal(res.dataless, true);
+  assert.equal(res.hasBlank, false);
+});
+
 test('a selection audits its top-left cell', async () => {
   const { res } = await run('A1:B3');
   assert.equal(res.origin.a1, 'A1');
