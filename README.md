@@ -64,9 +64,13 @@ client that you create once. Nothing is ever written to the spreadsheet.
    run asks for Google sign-in and read-only access. Rebind the key at
    `chrome://extensions/shortcuts` if it clashes.
 
-Keys: ↑/↓ walk (the selection follows), Enter = New Origin, Backspace/← = Back,
-Esc = OK. "Include Hidden Sheets" is off by default because jumping into a hidden
-sheet makes Sheets unhide it; the panel says so when it happens.
+Keys: ↑/↓ walk (the selection follows; row 0 is the origin), → = New Origin
+(drill into the highlighted cell), Backspace/← = Back, Enter = close and stay
+where the walk left you, Esc/OK = return to the origin and close. The toolbar
+icon opens Scopion too. "Include Hidden Sheets" is off by default because
+jumping into a hidden sheet makes Sheets unhide it; the panel says so when it
+happens. An .xlsx opened in Sheets is refused by the Sheets API: Scopion then
+runs from the page alone — references and jumps work, values show as "—".
 
 Tests: `node extension/build.js --lib-only && node --test extension/test/*.test.js`.
 Publishing on the Chrome Web Store additionally needs Google's verification of

@@ -1,15 +1,21 @@
 # Project Memory
-最終更新: 2026-09-04
+最終更新: 2026-09-05
 
 ## 現在の状態
-Scopion = formula auditor for Google Sheets. Apps Script build frozen: bound script on test sheet 11GMudQJ1VmzTgscq4sY82ceb1lHywWKisegzQPQC3P0, launched via Cmd+Option+Shift+1 macro (Karabiner rule `Cmd+Shift+A`). Deploy: edit monaco in the Apps Script editor tab, then verify the checksum before saving — string transport silently corrupts characters. Row/column neighbour flag shipped (commit dac2d5a), not yet ported to extension. Chrome extension (`extension/` on branch feat/chrome-extension) spec: `docs/superpowers/specs/2026-09-03-scopion-chrome-extension-design.md`, plan: `docs/superpowers/plans/2026-09-03-scopion-chrome-extension.md`.
+Scopion = formula auditor for Google Sheets, an ACE (Excel VBA) port. Two builds:
+- Apps Script (frozen): bound script on test sheet 11GMudQJ1VmzTgscq4sY82ceb1lHywWKisegzQPQC3P0, macro Cmd+Option+Shift+1, Karabiner rule Cmd+Shift+A. Row/column neighbour flag shipped there (dac2d5a), not yet ported to the extension. Deploy = edit monaco in the editor tab, verify the checksum before saving (string transport corrupts characters).
+- Chrome extension (`extension/`, MV3): the product now. User-verified live 2026-09-05: shortcut Ctrl+Shift+A + toolbar icon, origin row first, ↑↓ walk with the selection following, range rows select the whole block, → drill, ←/Backspace back, Enter close-and-stay, Esc return-and-close, liquid-glass panel, formula-token ↔ row colour link, cross-sheet rows bold, smart placement (right → below → above), DOM-only mode when the Sheets API refuses the file (.xlsx opened in Sheets: values "—", jumps work). Scorpius icon: extension/icons (`swift extension/icons/render.swift scorpio.svg extension/icons`).
+Spec: docs/superpowers/specs/2026-09-03-scopion-chrome-extension-design.md. Plan: docs/superpowers/plans/2026-09-03-scopion-chrome-extension.md.
 
 ## 直近の作業
-Tasks 1–9 complete and reviewed. Task 10 (smoke test + docs) in progress: checklist appended to tests/README.md, live test pending user's GCP OAuth client (README steps 1–3). Verification: `node run_tests.js` (35/35), `node run_e2e.js`, `node extension/build.js --lib-only && node --test extension/test/*.test.js` (38 tests). Sheets DOM facts verified live 2026-09-03: name-box (#t-name-box) value = address or named-range name, formula-bar (#t-formula-bar-input) textContent = formula, `.active-cell-border` ×4 union = cell rect, jump via name box + Enter (`'Sheet'!A1` works), hidden-sheet jump unhides. API enum: `ErrorValue.type` is `DIVIDE_BY_ZERO`, not `DIV_0`.
+Branch feat/chrome-extension (worktree .worktrees/chrome-extension): all 10 plan tasks, final review, fix wave, then live smoke fixes. The user's Chrome loads the extension unpacked from `.worktrees/chrome-extension/extension` (id ihjnpijodijcbigekdihoamchmkgdgie, GCP project 839296398878; oauth.local.json + scopion.pem are git-ignored and live only there). Every code change needs chrome://extensions ↻ AND a reload of the sheet tab (content scripts do not re-inject).
+Verification: `node run_tests.js` (35/35), `node run_e2e.js`, `node extension/build.js --lib-only && node --test extension/test/*.test.js` (42; the `--test <dir>` form is broken on Node 26.5 here). Smoke checklist: tests/README.md. Automation trigger: `document.dispatchEvent(new CustomEvent('scopion:toggle'))`; debug trace in `#scopion-host` dataset.trace.
+Sheets DOM facts (verified live): `#t-name-box` value = address / range / covering named-range name; `#t-formula-bar-input` = formula; `.active-cell-border` ×4 = cell rect, `.selection-border` ×4 = range rect (hidden pieces are 0×0 at the page corner — skip); jump = name box + Enter (`'Sheet'!A1`, `B1:B3`, bare names work; a hidden sheet gets unhidden); `#waffle-rich-text-editor`.focus() returns the keyboard to the grid. API enum: ErrorValue.type is DIVIDE_BY_ZERO.
+Test sheet sheets: Model, Inputs (constants, lookup table), Calc (50 formulas: cross-sheet, hidden, OFFSET/INDEX/INDIRECT, names, blanks, whole col/row, LET, ARRAYFORMULA, errors), Hidden Calc.
+Known limits: MATCH exact-only; `=SUM(INDEX(..):INDEX(..))` reports endpoints; the Apps Script sidebar iframe is unreachable from automation (walk checked via tests/harness.html).
 
 ## 次のタスク / 未解決
-- Web Store publication needs Google sensitive-scope verification; re-hide needs `spreadsheets` write scope.
-- Port row/column neighbour flag to extension (3×3 block fetch).
-- Default shortcut is `Ctrl+Shift+A` on every platform, including Mac; `Cmd+Shift+A` is avoided because it is Chrome's own tab-search shortcut on macOS.
-- Known limits: MATCH is exact-match only; `=SUM(INDEX(..):INDEX(..))` reports both endpoints, not the span between them; the sidebar iframe is unreachable from browser automation, so the walk is checked via tests/harness.html.
-- Competitors: SheetTrace (shortcuts), SheetWhiz (What-If/Goal Seek), Formula Tracer Sidebar (Marketplace). Neighbour diff is the differentiator.
+- Merge feat/chrome-extension into main; keep the worktree while Chrome points at it, or copy oauth.local.json + scopion.pem into `Scopion/extension`, build there, and load unpacked from that path (same id thanks to the pinned key).
+- Web Store publication needs Google's sensitive-scope verification; re-hiding sheets needs the `spreadsheets` write scope; port the neighbour flag to the extension (3×3 block fetch).
+- Parked: dom.js jump settle accepts any name-shaped name-box value (narrow race on cross-sheet jumps into named cells) — compare against namesCovering() if it ever bites.
+- Competitors: SheetTrace (shortcuts), SheetWhiz (What-If/Goal Seek/Auto-Color), Formula Tracer Sidebar. Neighbour diff is the differentiator none has.
