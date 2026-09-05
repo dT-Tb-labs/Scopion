@@ -15,6 +15,7 @@ var SHEETS_SEL = {
   tabName: '.docs-sheet-tab-name',
   activeTab: '.docs-sheet-active-tab'
 };
+var SHEETS_IDS = { gridEditor: 'waffle-rich-text-editor' };
 var JUMP_SETTLE_MS = 300;
 
 function spreadsheetIdFromPath(pathname) {
@@ -92,6 +93,16 @@ var SheetsDom = {
    */
   selectionRect: function () {
     return unionRects(borderRects(SHEETS_SEL.selectionBorder)) || unionRects(borderRects(SHEETS_SEL.activeBorder));
+  },
+  /**
+   * Hand the keyboard back to the grid. Sheets routes cell navigation through
+   * its hidden cell editor; focusing it is what Enter in the name box does too
+   * (verified live: focus + ArrowDown moved the selection). Without this, a
+   * closed panel keeps the focus and the arrow keys go nowhere until Esc.
+   */
+  focusGrid: function () {
+    var el = document.getElementById(SHEETS_IDS.gridEditor);
+    if (el) el.focus();
   },
   sheetTabs: function () {
     var tabs = document.querySelectorAll(SHEETS_SEL.tab), out = [];

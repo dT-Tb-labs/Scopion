@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#1b2a55"/>
+      <stop offset="1" stop-color="#070b1c"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="62" fill="url(#bg)"/>
+  <!-- Scorpius: claws top-left, body curving down-right, tail hooking back up -->
+  <polyline points="18,30 30,36 40,44 48,56 52,70 58,84 70,96 86,100 100,92 106,78 98,66" fill="none" stroke="#c9d6ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+  <polyline points="30,36 22,44 26,54" fill="none" stroke="#c9d6ff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <polyline points="30,36 34,24 44,18" fill="none" stroke="#c9d6ff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <g fill="#f4f6ff">
+    <circle cx="18" cy="30" r="3.2"/>
+    <circle cx="30" cy="36" r="2.6"/>
+    <circle cx="22" cy="44" r="2.2"/>
+    <circle cx="26" cy="54" r="2.4"/>
+    <circle cx="34" cy="24" r="2.2"/>
+    <circle cx="44" cy="18" r="2.6"/>
+    <circle cx="40" cy="44" r="2.8"/>
+    <circle cx="52" cy="70" r="2.6"/>
+    <circle cx="58" cy="84" r="2.8"/>
+    <circle cx="70" cy="96" r="2.6"/>
+    <circle cx="86" cy="100" r="3.0"/>
+    <circle cx="100" cy="92" r="2.8"/>
+    <circle cx="106" cy="78" r="3.4"/>
+    <circle cx="98" cy="66" r="2.6"/>
+  </g>
+  <!-- Antares, the red heart -->
+  <circle cx="48" cy="56" r="5.5" fill="#ff5a3c"/>
+  <circle cx="48" cy="56" r="9" fill="#ff5a3c" opacity="0.25"/>
+</svg>

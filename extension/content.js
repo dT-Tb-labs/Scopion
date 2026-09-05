@@ -238,6 +238,7 @@
       console.warn('Scopion: could not return to the origin: ' + (e && e.message ? e.message : e));
     }).then(function () {
       S.panel.close();
+      SheetsDom.focusGrid(); // the list had the keyboard; give it back to the cells
       S.walk = null; S.lastJump = null; S.busy = false;
       if (S.unhidden.length) console.info('Scopion left these sheets visible: ' + S.unhidden.join(', '));
     });
