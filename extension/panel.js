@@ -25,13 +25,13 @@ var PANEL_CSS = [
   '.title .x{width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;cursor:pointer;color:#3a4460;',
   '  background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px rgba(30,40,80,.12);transition:background .12s,transform .08s}',
   '.title .x:hover{background:#ff5f57;color:#fff}.title .x:active{transform:scale(.94)}',
-  '.body{position:relative;height:124px}.body.adv{height:164px}',
-  '.crumbs{position:absolute;left:8px;top:100px;width:459px;height:22px;line-height:22px;white-space:nowrap;overflow:hidden;font-size:11px;color:#5b6580}',
+  '.body{position:relative;height:100px}.body.adv{height:140px}',
+  '.names .trail{flex:1;min-width:0;overflow:hidden;white-space:nowrap}.names .rn{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#5b6580}',
   '.crumb{display:inline-block;max-width:150px;height:18px;line-height:18px;padding:0 8px;border-radius:999px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;',
   '  color:#1c2333;cursor:pointer;background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px rgba(30,40,80,.12);transition:background .12s}',
   '.crumb:hover{background:rgba(255,255,255,.9)}',
   '.crumb.cur{cursor:default;font-weight:600;color:#0b2a6b;background:linear-gradient(180deg,rgba(84,132,255,.30),rgba(84,132,255,.18));box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 0 1px rgba(84,132,255,.45)}',
-  '.crumbs .sep{margin:0 4px;color:#8a93aa}',
+  '.names .sep{margin:0 4px;color:#8a93aa}',
   '.pane{background:rgba(255,255,255,.42);border-radius:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 0 0 1px rgba(30,40,80,.10)}',
   '.list{position:absolute;left:8px;top:6px;width:459px;height:88px;overflow-y:auto;outline:none;padding:3px}',
   '.list.blank{background:rgba(255,214,0,.28)}',
@@ -47,7 +47,7 @@ var PANEL_CSS = [
   '  font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.45}',
   '.origin .lbl{color:#5b6580;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:10px;letter-spacing:.06em;margin-right:6px}',
   '.tok{border-radius:4px;padding:0 3px;font-weight:600}',
-  '.names{position:absolute;left:475px;top:70px;width:340px;height:24px;line-height:24px;padding:0 8px;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#3a4460}',
+  '.names{position:absolute;left:475px;top:70px;width:340px;height:24px;line-height:22px;padding:0 6px;box-sizing:border-box;display:flex;align-items:center;gap:6px;font-size:11px;color:#3a4460}',
   '.names .lbl{color:#5b6580;font-weight:600;font-size:10px;letter-spacing:.06em;margin-right:6px}',
   'button{position:absolute;height:24px;padding:0 12px;font:inherit;font-weight:600;color:#1c2333;cursor:pointer;border:0;border-radius:999px;',
   '  background:rgba(255,255,255,.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px rgba(30,40,80,.14),0 1px 2px rgba(20,30,60,.08);transition:background .12s,transform .08s}',
@@ -55,12 +55,12 @@ var PANEL_CSS = [
   'button:focus-visible{outline:2px solid rgba(84,132,255,.7);outline-offset:1px}',
   '.ok{left:822px;top:70px;width:80px;color:#fff;background:linear-gradient(180deg,#5c8cff,#3b6cf0);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 2px 6px rgba(59,108,240,.35)}',
   '.ok:hover{background:linear-gradient(180deg,#6b97ff,#4576f5)}',
-  '.adv-row{position:absolute;top:128px;left:8px;right:8px;height:30px;display:none}.body.adv .adv-row{display:block}',
+  '.adv-row{position:absolute;top:104px;left:8px;right:8px;height:30px;display:none}.body.adv .adv-row{display:block}',
   '.adv-row label{position:absolute;top:6px;white-space:nowrap;color:#3a4460}.adv-row input{vertical-align:-2px;accent-color:#3b6cf0}',
-  '.back{left:610px;top:130px;width:72px}.advbtn{left:704px;top:130px;width:96px}.neworigin{left:812px;top:130px;width:90px}',
+  '.back{left:610px;top:106px;width:72px}.advbtn{left:704px;top:106px;width:96px}.neworigin{left:812px;top:106px;width:90px}',
   '.body:not(.adv) .back,.body:not(.adv) .advbtn,.body:not(.adv) .neworigin{display:none}',
   '.notice{position:absolute;left:475px;top:96px;width:340px;color:#8a4b00;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-  '.body.adv .notice{top:160px}',
+  '.body.adv .notice{top:136px}',
   '.busy .list{opacity:.6}',
   '.hl{position:fixed;z-index:2147482999;pointer-events:none;box-sizing:border-box;border-radius:3px;transition:left .12s,top .12s,width .12s,height .12s}',
   '.hl.walk{background:rgba(255,178,96,.22);border:2px solid #e39a3b;box-shadow:0 0 0 3px rgba(227,154,59,.18)}',
@@ -87,8 +87,7 @@ function createPanel(handlers) {
     '<div class="body">' +
       '<div class="list pane" tabindex="0" role="listbox" aria-label="Precedents"></div>' +
       '<div class="origin pane"></div>' +
-      '<div class="names pane"></div>' +
-      '<div class="crumbs" aria-label="History"></div>' +
+      '<div class="names pane" aria-label="History and range names"></div>' +
       '<div class="notice"></div>' +
       '<button class="ok">OK</button>' +
       '<div class="adv-row">' +
@@ -194,14 +193,15 @@ function createPanel(handlers) {
     var colors = rowColors(v.rows || []);
     $('.origin').innerHTML = '<span class="lbl">ORIGIN FORMULA</span>' +
       (v.originFormula ? formulaHtml(v.originFormula, v.rows || [], colors) : '<span style="color:#5b6580">(not a formula)</span>');
-    $('.names').innerHTML = v.names && v.names.length ? '<span class="lbl">RANGE NAME</span>' + esc(v.names.join(' | ')) : '';
     // Breadcrumbs: every origin drilled through, oldest first, then the current one.
     var crumbs = (v.history || []).map(function (h, i) {
       var label = h.sheetName + '!' + h.a1;
       return '<span class="crumb" data-depth="' + i + '" title="Back to ' + esc(label) + '">' + esc(label) + '</span>';
     });
     if (v.origin) crumbs.push('<span class="crumb cur">' + esc(v.origin.sheetName + '!' + v.origin.a1) + '</span>');
-    $('.crumbs').innerHTML = crumbs.join('<span class="sep">›</span>');
+    // The trail shares the box beside OK with the range names (ACE's txtNames), which are usually empty.
+    $('.names').innerHTML = '<span class="trail">' + crumbs.join('<span class="sep">›</span>') + '</span>' +
+      (v.names && v.names.length ? '<span class="rn" title="' + esc(v.names.join(' | ')) + '"><span class="lbl">RANGE NAME</span>' + esc(v.names.join(' | ')) + '</span>' : '');
     $('.back').disabled = !v.canBack;
     $('.advbtn').textContent = v.advanced ? 'Simple' : 'Advanced';
     ['showExternal', 'showNames', 'includeHidden'].forEach(function (k) {
@@ -219,7 +219,7 @@ function createPanel(handlers) {
 
   function notice(text) { $('.notice').textContent = text || ''; $('.notice').title = text || ''; }
 
-  function height() { return 30 + (view && view.advanced ? 164 : 124); }
+  function height() { return 30 + (view && view.advanced ? 140 : 100); }
 
   function place(p) {
     var w = 910, h = height();
@@ -260,7 +260,7 @@ function createPanel(handlers) {
     if (view.rows[i] && view.rows[i].external) handlers.onExternal(i); else handlers.onWalk(i);
     list.focus();
   });
-  $('.crumbs').addEventListener('click', function (ev) {
+  $('.names').addEventListener('click', function (ev) {
     var c = ev.target.closest('.crumb');
     if (c && c.dataset.depth !== undefined && handlers.onCrumb) handlers.onCrumb(Number(c.dataset.depth));
   });
