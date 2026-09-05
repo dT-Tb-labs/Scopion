@@ -12,7 +12,7 @@
 var BLANK_LABEL = '---BLANK CELL---';
 var MAX_TOTAL_CELLS = 5000;   // a range row past this shows "(N cells)" instead of a total
 var MAX_FETCH_CELLS = 50000;  // a reference past this is fetched as its top-left cell only
-var DEFAULT_SETTINGS = { includeHidden: false, showNames: true, showExternal: true };
+var DEFAULT_SETTINGS = { includeHidden: true, showNames: true, showExternal: true };
 
 function rectCells(r) { return (r.r2 - r.r1 + 1) * (r.c2 - r.c1 + 1); }
 function topLeft(r) { return rect(r.sheetName, r.r1, r.c1, r.r1, r.c1); }

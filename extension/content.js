@@ -81,6 +81,7 @@
     var w = S.walk;
     return Object.assign({
       originFormula: w ? w.originFormula : '', originSheet: w ? w.origin.sheetName : '',
+      origin: w ? w.origin : null, history: w ? w.history : [],
       names: w ? w.names : [], rows: w ? w.rows : [], active: w ? w.active : -1,
       hasBlank: w ? w.hasBlank : false, unresolved: w ? w.unresolved : [], canBack: !!(w && w.history.length),
       advanced: S.advanced, settings: S.settings, busy: S.busy, unhidden: S.unhidden,
@@ -245,22 +246,51 @@
       }).catch(fail);
   }
 
-  /** OK / Esc: return to where the session started, clear the overlays, close. */
+  /** Breadcrumb click: return to the origin at history[depth], dropping everything after it. */
+  function backTo(depth) {
+    if (S.busy || !S.walk || depth < 0 || depth >= S.walk.history.length) return;
+    var target = S.walk.history[depth], history = S.walk.history.slice(0, depth);
+    setBusy(true);
+    resync().then(function () { return jump(target); })
+      .then(function () { return audit(target, SheetsDom.formula()); })
+      .then(function (res) {
+        S.walk = walkFrom(res, history);
+        setBusy(false); render(); paintHighlights(); S.panel.focus();
+      }).catch(fail);
+  }
+
+  /**
+   * Sheets unhid these when the walk entered them; hide them again on the way
+   * out (ACE restored visibility on exit). The sheet the user is left on
+   * cannot be hidden, so it is skipped. Needs cell data (an API-backed
+   * snapshot) for the sheet ids.
+   */
+  function rehideUnhidden(stay) {
+    if (!S.unhidden.length || !S.snap || S.snap.dataless) return Promise.resolve();
+    var keep = stay ? SheetsDom.activeSheetName() : (S.walk ? walkRoot(S.walk).sheetName : null);
+    var ids = S.unhidden.filter(function (n) { return n !== keep; })
+      .map(function (n) { var s = S.snap.getSheetByName(n); return s ? s.getSheetId() : null; })
+      .filter(function (id) { return id !== null && id !== undefined; });
+    S.unhidden = [];
+    if (!ids.length) return Promise.resolve();
+    return rpc({ type: 'scopion:rehide', spreadsheetId: S.spreadsheetId, sheetIds: ids });
+  }
+
   /** OK / Esc return to where the session started; Enter (stay=true) keeps the selection where the walk left it. */
   function close(stay) {
     if (S.tick) { clearInterval(S.tick); S.tick = null; }
     var root = S.walk && !stay ? walkRoot(S.walk) : null;
     chrome.storage.local.set({ panelPos: S.panel.getPosition() });
+    var warn = function (what) { return function (e) { console.warn('Scopion: ' + what + ': ' + (e && e.message ? e.message : e)); }; };
     var p = root ? SheetsDom.jump(root.sheetName, root.a1) : Promise.resolve();
-    // The panel must close even if the return jump fails — nobody sees a notice once it is gone.
-    p.catch(function (e) {
-      console.warn('Scopion: could not return to the origin: ' + (e && e.message ? e.message : e));
-    }).then(function () {
-      S.panel.close();
-      SheetsDom.focusGrid(); // the list had the keyboard; give it back to the cells
-      S.walk = null; S.lastJump = null; S.busy = false;
-      if (S.unhidden.length) console.info('Scopion left these sheets visible: ' + S.unhidden.join(', '));
-    });
+    // The panel must close even if the return jump or the re-hide fails — nobody sees a notice once it is gone.
+    p.catch(warn('could not return to the origin'))
+      .then(function () { return rehideUnhidden(!!stay); }).catch(warn('could not re-hide sheets'))
+      .then(function () {
+        S.panel.close();
+        SheetsDom.focusGrid(); // the list had the keyboard; give it back to the cells
+        S.walk = null; S.lastJump = null; S.busy = false;
+      });
   }
 
   function setSetting(key, value) {
@@ -283,6 +313,7 @@
       onWalk: walkTo,
       onDrill: drill,
       onBack: back,
+      onCrumb: backTo,
       onClose: function () { close(false); },
       onCommit: function () { close(true); },
       onNewOrigin: newOrigin,

@@ -53,8 +53,10 @@ test('OFFSET into a hidden sheet: resolved target fetched second, hidden rows fo
   assert.equal(shown.res.rows[0].value, '8');
   assert.equal(shown.api.calls.length, 2);
   assert.deepEqual(shown.api.calls[1], ["'Hidden Calc'!A2"]);
-  const hidden = await run('A2');
-  assert.deepEqual(addrs(hidden.res), ['Inputs!B3'], 'hidden sheets are off by default');
+  const hidden = await run('A2', { includeHidden: false });
+  assert.deepEqual(addrs(hidden.res), ['Inputs!B3'], 'hidden-sheet rows can be switched off');
+  const dflt = await run('A2');
+  assert.equal(dflt.res.rows.length, 3, 'and are shown by default');
 });
 
 test('INDEX onto an empty cell raises the blank alert; the range row shows its total', async () => {

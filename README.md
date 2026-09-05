@@ -52,7 +52,7 @@ client that you create once. Nothing is ever written to the spreadsheet.
 2. **Google Cloud**: create a project → *APIs & Services ▸ Library* → enable
    **Google Sheets API** → *OAuth consent screen*: External, publishing status
    *Testing*, add your Google account as a test user, add the scope
-   `https://www.googleapis.com/auth/spreadsheets.readonly` → *Credentials ▸ Create
+   `https://www.googleapis.com/auth/spreadsheets` → *Credentials ▸ Create
    credentials ▸ OAuth client ID*, application type **Chrome Extension**, Item ID =
    the extension ID from step 1. Copy the client ID.
 3. `cp extension/oauth.example.json extension/oauth.local.json` and fill in
@@ -67,14 +67,17 @@ client that you create once. Nothing is ever written to the spreadsheet.
 Keys: ↑/↓ walk (the selection follows; row 0 is the origin), → = New Origin
 (drill into the highlighted cell), Backspace/← = Back, Enter = close and stay
 where the walk left you, Esc/OK = return to the origin and close. The toolbar
-icon opens Scopion too. "Include Hidden Sheets" is off by default because
-jumping into a hidden sheet makes Sheets unhide it; the panel says so when it
-happens. An .xlsx opened in Sheets is refused by the Sheets API: Scopion then
+icon opens Scopion too. Hidden sheets are walked like any other: Sheets unhides
+a sheet when you jump into it, and Scopion hides it again when you close — that
+re-hide is the only write it makes, and the reason the OAuth scope is
+`spreadsheets` rather than read-only. The breadcrumb row under the list shows
+every origin you drilled through; click one to go back there. An .xlsx opened
+in Sheets is refused by the Sheets API: Scopion then
 runs from the page alone — references and jumps work, values show as "—".
 
 Tests: `node extension/build.js --lib-only && node --test extension/test/*.test.js`.
 Publishing on the Chrome Web Store additionally needs Google's verification of
-the sensitive `spreadsheets.readonly` scope.
+the sensitive `spreadsheets` scope.
 
 ## What changed in the port, and why
 

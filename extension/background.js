@@ -16,9 +16,20 @@ function gridUrl(spreadsheetId, ranges) {
     ranges.map(function (r) { return '&ranges=' + encodeURIComponent(r); }).join('');
 }
 
-/** GET with a cached token; on 401 drop the token and retry once interactively. */
-function apiGet(url, deps) {
-  function call(token) { return deps.fetch(url, { headers: { Authorization: 'Bearer ' + token } }); }
+function rehideUrl(spreadsheetId) { return SHEETS_API + encodeURIComponent(spreadsheetId) + ':batchUpdate'; }
+/** The only write Scopion ever makes: hide again the sheets it had to unhide to walk into. */
+function rehideBody(sheetIds) {
+  return { requests: sheetIds.map(function (id) {
+    return { updateSheetProperties: { properties: { sheetId: id, hidden: true }, fields: 'hidden' } };
+  }) };
+}
+
+/** Authorised fetch with a cached token; on 401 drop the token and retry once interactively. */
+function apiCall(url, init, deps) {
+  function call(token) {
+    var headers = Object.assign({ Authorization: 'Bearer ' + token }, (init && init.headers) || {});
+    return deps.fetch(url, Object.assign({}, init || {}, { headers: headers }));
+  }
   return deps.getToken(false).catch(function () { return deps.getToken(true); })
     .then(function (token) {
       return call(token).then(function (res) {
@@ -30,6 +41,10 @@ function apiGet(url, deps) {
       if (res.ok) return res.json();
       return res.text().then(function (body) { throw new Error('Sheets API ' + res.status + ': ' + String(body).slice(0, 200)); });
     });
+}
+function apiGet(url, deps) { return apiCall(url, null, deps); }
+function apiPost(url, body, deps) {
+  return apiCall(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, deps);
 }
 
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
@@ -53,6 +68,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     if (!msg || !msg.type) return false;
     var p;
     if (msg.type === 'scopion:meta') p = apiGet(metaUrl(msg.spreadsheetId), chromeDeps);
+    else if (msg.type === 'scopion:rehide') {
+      if (!msg.sheetIds || !msg.sheetIds.length) { sendResponse({ ok: true, data: null }); return true; }
+      p = apiPost(rehideUrl(msg.spreadsheetId), rehideBody(msg.sheetIds), chromeDeps);
+    }
     else if (msg.type === 'scopion:grid') {
       // An empty ranges list means "the whole spreadsheet" to the Sheets API,
       // not "nothing" — never send that request.

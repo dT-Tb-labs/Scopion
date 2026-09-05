@@ -26,7 +26,8 @@ test('build renders manifest.json from the template and the local oauth file', (
     assert.equal(m.manifest_version, 3);
     assert.equal(m.oauth2.client_id, 'cid.apps.googleusercontent.com');
     assert.equal(m.key, 'MIIB');
-    assert.deepEqual(m.oauth2.scopes, ['https://www.googleapis.com/auth/spreadsheets.readonly']);
+    // Read/write: the one write is re-hiding sheets the walk had to unhide.
+    assert.deepEqual(m.oauth2.scopes, ['https://www.googleapis.com/auth/spreadsheets']);
     assert.equal(m.commands['toggle-scopion'].suggested_key.default, 'Ctrl+Shift+A');
     assert.equal(m.commands['toggle-scopion'].suggested_key.mac, 'Ctrl+Shift+A');
     assert.deepEqual(m.host_permissions, ['https://docs.google.com/spreadsheets/*', 'https://sheets.googleapis.com/*']);
