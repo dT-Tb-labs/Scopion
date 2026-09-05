@@ -9,15 +9,30 @@
  *   node extension/build.js              full build (needs extension/oauth.local.json)
  *   node extension/build.js --lib-only   lib/ only, for tests
  *   node extension/build.js path.json    use another oauth file
+ *   node extension/build.js --pack [--pem scopion.pem] [--out dir]
+ *       full build, then dist/scopion-<version>.zip with only the files the
+ *       extension runs — no tests, credentials, sources of the icons, or the
+ *       manifest "key" (the store assigns the key; the .pem, zipped as key.pem
+ *       on the first upload, is what keeps the extension ID).
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const ext = __dirname;
 const root = path.join(ext, '..');
 const args = process.argv.slice(2);
 const libOnly = args.includes('--lib-only');
-const oauthPath = args.find((a) => a !== '--lib-only') || path.join(ext, 'oauth.local.json');
+const pack = args.includes('--pack');
+function flag(name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; }
+const pemPath = flag('--pem');
+const outDir = flag('--out') || path.join(root, 'dist');
+const flagValues = [pemPath, outDir].filter(Boolean);
+const oauthPath = args.find((a) => !a.startsWith('--') && !flagValues.includes(a)) || path.join(ext, 'oauth.local.json');
+
+/** The files that ship. Anything not listed here stays out of the zip on purpose. */
+const SHIP = ['manifest.json', 'background.js', 'content.js', 'adapter.js', 'audit.js', 'state.js', 'dom.js', 'panel.js',
+  'lib/formula.js', 'lib/trace.js', 'icons/icon16.png', 'icons/icon32.png', 'icons/icon48.png', 'icons/icon128.png'];
 
 fs.mkdirSync(path.join(ext, 'lib'), { recursive: true });
 for (const [src, dst] of [['Formula.gs', 'formula.js'], ['Trace.gs', 'trace.js']]) {
@@ -42,3 +57,21 @@ manifest.oauth2.client_id = local.client_id;
 manifest.key = local.key;
 fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 console.log('built extension/lib and extension/manifest.json');
+if (!pack) process.exit(0);
+
+// Stage the shipping files in a clean directory so the zip cannot pick up
+// oauth.local.json, *.pem, test/ or the build script by accident.
+const stage = fs.mkdtempSync(path.join(require('os').tmpdir(), 'scopion-pack-'));
+for (const rel of SHIP) {
+  fs.mkdirSync(path.dirname(path.join(stage, rel)), { recursive: true });
+  fs.copyFileSync(path.join(ext, rel), path.join(stage, rel));
+}
+delete manifest.key;
+fs.writeFileSync(path.join(stage, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+if (pemPath) fs.copyFileSync(pemPath, path.join(stage, 'key.pem'));
+fs.mkdirSync(outDir, { recursive: true });
+const zipPath = path.join(outDir, 'scopion-' + manifest.version + '.zip');
+fs.rmSync(zipPath, { force: true });
+execFileSync('zip', ['-qrDX', zipPath, '.'], { cwd: stage });
+fs.rmSync(stage, { recursive: true, force: true });
+console.log('packed ' + path.relative(process.cwd(), zipPath) + (pemPath ? ' (with key.pem)' : ''));

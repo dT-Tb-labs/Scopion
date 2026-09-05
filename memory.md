@@ -1,5 +1,5 @@
 # Project Memory
-最終更新: 2026-09-05
+最終更新: 2026-09-05 (store audit)
 
 ## 現在の状態
 Scopion = formula auditor for Google Sheets, an ACE (Excel VBA) port. Two builds:
@@ -16,6 +16,6 @@ Known limits: MATCH exact-only; `=SUM(INDEX(..):INDEX(..))` reports endpoints; t
 
 ## 次のタスク / 未解決
 - Chrome Web Store competitors (2026-09-05): SheetTrace (DOM-based precedents, free), SheetWhiz + Formula Explorer (arrow-key navigation, Goal Seek/What-If, YC), XLKeys, ShortieCuts. Scopion lacks Dependents (dropped on purpose) — a weakness for financial modellers; differentiators: origin row/range selection, token colour link, hidden re-hide, xlsx mode, breadcrumbs.
-- Web Store publication needs Google's verification of the sensitive `spreadsheets` scope; port the neighbour flag to the extension (3×3 block fetch); consider Dependents via API scan.
+- Web Store (2026-09-05 audit): `node extension/build.js --pack [--pem extension/scopion.pem]` → dist/scopion-<v>.zip (ship list only, manifest `key` stripped, key.pem in zip keeps the ID — unverified against Google docs, check the Item ID after the first upload). docs/store/PRIVACY.md (Limited Use text) + listing.md (justifications) still need a public URL; still needs OAuth verification of `spreadsheets`, 1280×800 screenshots, 440×280 promo tile. icon128 now 96px art + 16px padding (store rule). Port the neighbour flag (3×3 block fetch); consider Dependents via API scan.
 - Parked: dom.js jump settle accepts any name-shaped name-box value (narrow race on cross-sheet jumps into named cells) — compare against namesCovering() if it ever bites.
 - Scratch dirs to delete when the user agrees: `.superpowers/` (main) and `.worktrees/chrome-extension/.superpowers/` (git-ignored SDD ledgers).

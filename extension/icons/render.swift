@@ -8,7 +8,10 @@ for s in [16, 32, 48, 128] {
   NSGraphicsContext.saveGraphicsState()
   NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
   NSGraphicsContext.current?.imageInterpolation = .high
-  img.draw(in: NSRect(x: 0, y: 0, width: s, height: s), from: .zero, operation: .sourceOver, fraction: 1)
+  // The Web Store shows the 128 icon and asks for 96×96 artwork inside 16px of
+  // transparent padding; the toolbar sizes fill their square.
+  let inset = s == 128 ? 16 : 0
+  img.draw(in: NSRect(x: inset, y: inset, width: s - 2 * inset, height: s - 2 * inset), from: .zero, operation: .sourceOver, fraction: 1)
   NSGraphicsContext.restoreGraphicsState()
   try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "\(outDir)/icon\(s).png"))
 }

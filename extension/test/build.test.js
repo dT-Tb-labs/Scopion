@@ -38,6 +38,34 @@ test('build renders manifest.json from the template and the local oauth file', (
   }
 });
 
+test('--pack zips only the shipping files, without the manifest key, plus key.pem when given', () => {
+  const tmp = path.join(ext, 'test', 'oauth.tmp.json');
+  const out = fs.mkdtempSync(path.join(require('os').tmpdir(), 'scopion-dist-'));
+  const pem = path.join(out, 'fake.pem');
+  const manifestPath = path.join(ext, 'manifest.json');
+  const parked = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath) : null;
+  fs.writeFileSync(tmp, JSON.stringify({ client_id: 'cid.apps.googleusercontent.com', key: 'MIIB' }));
+  fs.writeFileSync(pem, 'not a real key');
+  try {
+    execFileSync('node', [path.join(ext, 'build.js'), tmp, '--pack', '--pem', pem, '--out', out]);
+    const version = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.template.json'), 'utf8')).version;
+    const zip = path.join(out, 'scopion-' + version + '.zip');
+    const listed = execFileSync('unzip', ['-Z1', zip]).toString().trim().split('\n').sort();
+    assert.deepEqual(listed, ['adapter.js', 'audit.js', 'background.js', 'content.js', 'dom.js', 'icons/icon128.png', 'icons/icon16.png',
+      'icons/icon32.png', 'icons/icon48.png', 'key.pem', 'lib/formula.js', 'lib/trace.js', 'manifest.json', 'panel.js', 'state.js']);
+    const m = JSON.parse(execFileSync('unzip', ['-p', zip, 'manifest.json']).toString());
+    assert.equal(m.key, undefined);
+    assert.equal(m.oauth2.client_id, 'cid.apps.googleusercontent.com');
+    // The developer's unpacked manifest keeps its key: only the zip drops it.
+    assert.equal(JSON.parse(fs.readFileSync(manifestPath, 'utf8')).key, 'MIIB');
+  } finally {
+    fs.unlinkSync(tmp);
+    fs.rmSync(out, { recursive: true, force: true });
+    if (parked) fs.writeFileSync(manifestPath, parked);
+    else fs.rmSync(manifestPath, { force: true });
+  }
+});
+
 test('build refuses to render a manifest without credentials', () => {
   assert.throws(
     () => execFileSync('node', [path.join(ext, 'build.js'), path.join(ext, 'test', 'does-not-exist.json')], { stdio: 'pipe' }),

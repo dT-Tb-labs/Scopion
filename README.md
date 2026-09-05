@@ -61,7 +61,7 @@ client that you create once. Nothing is ever written to the spreadsheet.
 5. `chrome://extensions` → Developer mode → **Load unpacked** → the `extension/`
    folder. Check the ID matches step 1.
 6. Open a spreadsheet, select a formula cell, press **Ctrl+Shift+A**. The first
-   run asks for Google sign-in and read-only access. Rebind the key at
+   run asks for Google sign-in and access to your spreadsheets. Rebind the key at
    `chrome://extensions/shortcuts` if it clashes.
 
 Keys: ↑/↓ walk (the selection follows; row 0 is the origin), → = New Origin
@@ -76,8 +76,14 @@ in Sheets is refused by the Sheets API: Scopion then
 runs from the page alone — references and jumps work, values show as "—".
 
 Tests: `node extension/build.js --lib-only && node --test extension/test/*.test.js`.
-Publishing on the Chrome Web Store additionally needs Google's verification of
-the sensitive `spreadsheets` scope.
+
+Web Store upload: `node extension/build.js --pack` writes
+`dist/scopion-<version>.zip` holding only the files the extension runs
+(no tests, build script, credentials or `key`). Pass `--pem extension/scopion.pem`
+on the first upload so the store keeps the extension ID the OAuth client is
+tied to. Listing text, permission justifications and the privacy policy the
+dashboard asks for are in `docs/store/`. Publishing additionally needs Google's
+verification of the sensitive `spreadsheets` scope.
 
 ## What changed in the port, and why
 
