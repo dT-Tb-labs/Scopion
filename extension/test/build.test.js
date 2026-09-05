@@ -15,6 +15,10 @@ test('build copies the Apps Script sources into lib/ unchanged', () => {
 
 test('build renders manifest.json from the template and the local oauth file', () => {
   const tmp = path.join(ext, 'test', 'oauth.tmp.json');
+  // A developer's real manifest.json (loaded unpacked in Chrome) must survive
+  // the test run: park it and put it back, never delete it.
+  const manifestPath = path.join(ext, 'manifest.json');
+  const parked = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath) : null;
   fs.writeFileSync(tmp, JSON.stringify({ client_id: 'cid.apps.googleusercontent.com', key: 'MIIB' }));
   try {
     execFileSync('node', [path.join(ext, 'build.js'), tmp]);
@@ -28,7 +32,8 @@ test('build renders manifest.json from the template and the local oauth file', (
     assert.deepEqual(m.host_permissions, ['https://docs.google.com/spreadsheets/*', 'https://sheets.googleapis.com/*']);
   } finally {
     fs.unlinkSync(tmp);
-    fs.rmSync(path.join(ext, 'manifest.json'), { force: true });
+    if (parked) fs.writeFileSync(manifestPath, parked);
+    else fs.rmSync(manifestPath, { force: true });
   }
 });
 
