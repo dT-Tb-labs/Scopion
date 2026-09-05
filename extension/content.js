@@ -227,9 +227,10 @@
   }
 
   /** OK / Esc: return to where the session started, clear the overlays, close. */
-  function close() {
+  /** OK / Esc return to where the session started; Enter (stay=true) keeps the selection where the walk left it. */
+  function close(stay) {
     if (S.tick) { clearInterval(S.tick); S.tick = null; }
-    var root = S.walk ? walkRoot(S.walk) : null;
+    var root = S.walk && !stay ? walkRoot(S.walk) : null;
     chrome.storage.local.set({ panelPos: S.panel.getPosition() });
     var p = root ? SheetsDom.jump(root.sheetName, root.a1) : Promise.resolve();
     // The panel must close even if the return jump fails — nobody sees a notice once it is gone.
@@ -262,7 +263,8 @@
       onWalk: walkTo,
       onDrill: drill,
       onBack: back,
-      onClose: close,
+      onClose: function () { close(false); },
+      onCommit: function () { close(true); },
       onNewOrigin: newOrigin,
       onAdvanced: function () { S.advanced = !S.advanced; render(); },
       onSetting: setSetting,

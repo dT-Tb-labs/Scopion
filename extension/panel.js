@@ -148,7 +148,9 @@ function createPanel(handlers) {
     else if (k === 'End') handlers.onWalk(view.rows.length - 1);
     else if (k === 'PageDown') handlers.onWalk(Math.min(view.rows.length - 1, view.active + 5));
     else if (k === 'PageUp') handlers.onWalk(Math.max(0, view.active - 5));
-    else if (k === 'Enter' || k === 'ArrowRight') handlers.onDrill();
+    // Enter commits: close and stay on the cell you walked to. → drills in. Esc cancels back to the origin.
+    else if (k === 'Enter') handlers.onCommit();
+    else if (k === 'ArrowRight') handlers.onDrill();
     else if (k === 'Backspace' || k === 'ArrowLeft') handlers.onBack();
     else if (k === 'Escape') handlers.onClose();
     else return;
