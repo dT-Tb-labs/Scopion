@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Scopion",
   "version": "0.1.0",
-  "description": "Active Cell Explorer for Google Sheets: list a formula's precedents and walk them with the arrow keys.",
+  "description": "Trace a formula's inputs in Google Sheets: Ctrl+Shift+A, walk the referenced cells with ↑↓, across sheets. For financial models.",
   "key": "",
   "permissions": ["identity", "storage"],
   "host_permissions": ["https://docs.google.com/spreadsheets/*", "https://sheets.googleapis.com/*"],
