@@ -72,10 +72,17 @@ if (watch) {
     fs.writeFileSync(stamp, JSON.stringify({ t: Date.now() }) + '\n');
     console.log('dev-reload stamped');
   };
-  const onChange = (_, file) => { if (file && skip.test(file)) return; clearTimeout(timer); timer = setTimeout(rebuild, 300); };
-  // Fixed, non-recursive watch set: recursive fs.watch hits EMFILE on macOS here.
-  for (const d of ['', '_locales/en', '_locales/ja', 'icons']) fs.watch(path.join(ext, d), onChange);
-  for (const f of ['Formula.gs', 'Trace.gs']) fs.watch(path.join(root, f), onChange);
+  const onChange = () => { clearTimeout(timer); timer = setTimeout(rebuild, 300); };
+  // stat polling, not fs.watch: kqueue/FSEvents are refused inside the Claude sandbox (EMFILE).
+  // Files present at start are watched; restart after adding a file.
+  const files = ['Formula.gs', 'Trace.gs'].map((f) => path.join(root, f));
+  for (const d of ['', '_locales/en', '_locales/ja', 'icons']) {
+    for (const f of fs.readdirSync(path.join(ext, d))) {
+      const p = path.join(ext, d, f);
+      if (!skip.test(f) && fs.statSync(p).isFile()) files.push(p);
+    }
+  }
+  for (const f of files) fs.watchFile(f, { interval: 500 }, (cur, prev) => { if (cur.mtimeMs !== prev.mtimeMs) onChange(); });
   rebuild();
   console.log('watching extension/ and Formula.gs, Trace.gs — Ctrl+C to stop');
   return;
