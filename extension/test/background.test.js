@@ -80,6 +80,16 @@ test('no cached token yet: fall through to the interactive prompt', async () => 
   assert.deepEqual(deps.log.slice(0, 2), [['getToken', false], ['getToken', true]]);
 });
 
+test('after a declined consent the API is tried silently: no interactive prompt, a "not signed in" error instead', async () => {
+  const B = load();
+  const deps = fakeDeps([200], [null, 'would-be-prompted']);
+  await assert.rejects(B.apiGet('u', deps, false), /not signed in/);
+  assert.deepEqual(deps.log, [['getToken', false]]); // never getToken(true)
+  const deps401 = fakeDeps([401, 200], ['stale', 'fresh']);
+  await assert.rejects(B.apiGet('u', deps401, false), /not signed in: token rejected/);
+  assert.deepEqual(deps401.log, [['getToken', false], ['fetch', 'Bearer stale', 401], ['removeToken', 'stale']]);
+});
+
 test('re-hide posts one updateSheetProperties per sheet with the token', async () => {
   const B = load();
   const seen = [];

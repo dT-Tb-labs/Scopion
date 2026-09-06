@@ -10,10 +10,15 @@
 
   var S = {
     spreadsheetId: null, snap: null, settings: null, panel: null,
-    walk: null, advanced: false, busy: false, lastJump: null, unhidden: [], savedPos: null, tick: null
+    walk: null, advanced: false, busy: false, lastJump: null, unhidden: [], savedPos: null, tick: null,
+    // Set when the user closed or declined the Google consent: for the rest of
+    // this page's life the API is tried silently only, so every open does not
+    // re-summon the consent window. A reload asks once more.
+    authDeclined: false
   };
 
   function rpc(msg) {
+    msg.interactive = !S.authDeclined;
     return new Promise(function (resolve, reject) {
       chrome.runtime.sendMessage(msg, function (r) {
         if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
@@ -62,6 +67,8 @@
       // page alone, so degrade instead of dying. The notice says why.
       trace('meta:error', String(e && e.message ? e.message : e));
       S.apiError = String(e && e.message ? e.message : e);
+      S.apiErrorKind = classifyApiError(S.apiError);
+      if (S.apiErrorKind === 'auth') S.authDeclined = true;
       S.snap = Snapshot.fromTabs(SheetsDom.sheetTabs());
       return S.snap;
     });
@@ -85,7 +92,7 @@
       names: w ? w.names : [], rows: w ? w.rows : [], active: w ? w.active : -1,
       hasBlank: w ? w.hasBlank : false, unresolved: w ? w.unresolved : [], canBack: !!(w && w.history.length),
       advanced: S.advanced, settings: S.settings, busy: S.busy, unhidden: S.unhidden,
-      dataless: !!(S.snap && S.snap.dataless), apiError: S.apiError || ''
+      dataless: !!(S.snap && S.snap.dataless), apiError: S.apiError || '', apiErrorKind: S.apiErrorKind || ''
     }, extra || {});
   }
   function render() { S.panel.render(view()); }

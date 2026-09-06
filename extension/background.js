@@ -37,17 +37,27 @@ function onboardingUrlFor(tab) {
   return 'onboarding.html' + (/^https:\/\/docs\.google\.com\/spreadsheets\/(?:u\/\d+\/)?d\//.test(url) ? '#reload' : '');
 }
 
-/** Authorised fetch with a cached token; on 401 drop the token and retry once interactively. */
-function apiCall(url, init, deps) {
+/**
+ * Authorised fetch with a cached token; on 401 drop the token and retry once.
+ * `interactive` (default true) allows the Google consent window when no token
+ * is cached; the content script passes false after the user has declined once,
+ * so a declined consent is not re-opened on every panel open.
+ */
+function apiCall(url, init, deps, interactive) {
+  var mayPrompt = interactive !== false;
   function call(token) {
     var headers = Object.assign({ Authorization: 'Bearer ' + token }, (init && init.headers) || {});
     return deps.fetch(url, Object.assign({}, init || {}, { headers: headers }));
   }
-  return deps.getToken(false).catch(function () { return deps.getToken(true); })
+  function prompt(err) {
+    if (!mayPrompt) throw new Error('not signed in: ' + (err && err.message ? err.message : err));
+    return deps.getToken(true);
+  }
+  return deps.getToken(false).catch(prompt)
     .then(function (token) {
       return call(token).then(function (res) {
         if (res.status !== 401) return res;
-        return deps.removeToken(token).then(function () { return deps.getToken(true); }).then(call);
+        return deps.removeToken(token).then(function () { return prompt(new Error('token rejected')); }).then(call);
       });
     })
     .then(function (res) {
@@ -55,9 +65,9 @@ function apiCall(url, init, deps) {
       return res.text().then(function (body) { throw new Error('Sheets API ' + res.status + ': ' + String(body).slice(0, 200)); });
     });
 }
-function apiGet(url, deps) { return apiCall(url, null, deps); }
-function apiPost(url, body, deps) {
-  return apiCall(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, deps);
+function apiGet(url, deps, interactive) { return apiCall(url, null, deps, interactive); }
+function apiPost(url, body, deps, interactive) {
+  return apiCall(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, deps, interactive);
 }
 
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
@@ -79,17 +89,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
   chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (!msg || !msg.type) return false;
-    var p;
-    if (msg.type === 'scopion:meta') p = apiGet(metaUrl(msg.spreadsheetId), chromeDeps);
+    var p, interactive = msg.interactive !== false;
+    if (msg.type === 'scopion:meta') p = apiGet(metaUrl(msg.spreadsheetId), chromeDeps, interactive);
     else if (msg.type === 'scopion:rehide') {
       if (!msg.sheetIds || !msg.sheetIds.length) { sendResponse({ ok: true, data: null }); return true; }
-      p = apiPost(rehideUrl(msg.spreadsheetId), rehideBody(msg.sheetIds), chromeDeps);
+      p = apiPost(rehideUrl(msg.spreadsheetId), rehideBody(msg.sheetIds), chromeDeps, interactive);
     }
     else if (msg.type === 'scopion:grid') {
       // An empty ranges list means "the whole spreadsheet" to the Sheets API,
       // not "nothing" — never send that request.
       if (!msg.ranges || !msg.ranges.length) { sendResponse({ ok: false, error: 'no ranges' }); return true; }
-      p = apiGet(gridUrl(msg.spreadsheetId, msg.ranges), chromeDeps);
+      p = apiGet(gridUrl(msg.spreadsheetId, msg.ranges), chromeDeps, interactive);
     }
     else return false;
     p.then(function (data) { sendResponse({ ok: true, data: data }); },

@@ -175,6 +175,22 @@ SnapNamedRange.prototype.getRange = function () { return this.range; };
 
 function quoteSheetName(name) { return "'" + String(name).replace(/'/g, "''") + "'"; }
 
+/**
+ * Why the Sheets API gave us nothing, from the error text background.js
+ * relays — so the panel can say the right thing instead of "Excel format?":
+ *   auth      the user closed or declined the Google consent, or Chrome has no signed-in account
+ *   forbidden the token works but cannot read this file (Chrome's account is not the sheet's owner/editor)
+ *   xlsx      an Excel file opened in Sheets; the API refuses the document
+ *   other     quota, network, anything else
+ */
+function classifyApiError(message) {
+  var m = String(message || '');
+  if (/did not approve|not granted|revoked|not signed in|no token|OAuth2|canceled|cancelled/i.test(m)) return 'auth';
+  if (/Sheets API 403/.test(m)) return 'forbidden';
+  if (/Sheets API 400.*not supported for this document/i.test(m)) return 'xlsx';
+  return 'other';
+}
+
 /** rect -> API range string, clipped to the grid so "A:A" never asks for ten million rows. */
 function apiRange(snap, r) {
   var s = snap.getSheetByName(r.sheetName);

@@ -27,6 +27,16 @@ function grid(sheetId, startRow, startColumn, rows) {
     }) })) }] }] };
 }
 
+test('API failures are classified so the panel can explain them', () => {
+  assert.equal(S.classifyApiError('The user did not approve access.'), 'auth');
+  assert.equal(S.classifyApiError('OAuth2 not granted or revoked.'), 'auth');
+  assert.equal(S.classifyApiError('not signed in: no token'), 'auth');
+  assert.equal(S.classifyApiError('Sheets API 403: {"error":{"status":"PERMISSION_DENIED"}}'), 'forbidden');
+  assert.equal(S.classifyApiError('Sheets API 400: {"error":{"message":"This operation is not supported for this document"}}'), 'xlsx');
+  assert.equal(S.classifyApiError('Sheets API 429: quota'), 'other');
+  assert.equal(S.classifyApiError(undefined), 'other');
+});
+
 test('sheets and hidden state come from properties', () => {
   const snap = new S.Snapshot(meta);
   assert.equal(snap.getSheets().length, 4);

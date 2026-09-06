@@ -212,7 +212,11 @@ function createPanel(handlers) {
         v.unresolved.map(function (u) { return u.raw + ' (' + u.reason + ')'; }).join('; ') : '';
     var unhiddenText = v.unhidden && v.unhidden.length ?
       'Sheets unhid: ' + v.unhidden.join(', ') + (v.dataless ? ' — re-hide by hand when done.' : ' — hidden again when Scopion closes.') : '';
-    var datalessText = v.dataless ? 'No cell data for this file (Excel format?) — references and jumps only.' : '';
+    var datalessText = !v.dataless ? '' : ({
+      auth: 'Not signed in, so no values — references and jumps still work. Reload the tab and press Ctrl+Shift+A to sign in.',
+      forbidden: "Chrome's Google account cannot read this spreadsheet's data (owned by another account?) — references and jumps only.",
+      xlsx: 'No cell data for this file (Excel format) — references and jumps only.'
+    })[v.apiErrorKind] || 'Sheets API unavailable — references and jumps only.';
     notice([datalessText, unresolvedText, unhiddenText].filter(Boolean).join(' · '));
     renderList(colors);
   }
