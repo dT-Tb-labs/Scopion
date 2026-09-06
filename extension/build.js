@@ -9,6 +9,8 @@
  *   node extension/build.js              full build (needs extension/oauth.local.json)
  *   node extension/build.js --lib-only   lib/ only, for tests
  *   node extension/build.js path.json    use another oauth file
+ *   node extension/build.js --watch     rebuild on change and bump dev-reload.json,
+ *       which the unpacked extension polls (dev-reload.js) to reload itself
  *   node extension/build.js --pack [--pem scopion.pem] [--out dir]
  *       full build, then dist/scopion-<version>.zip with only the files the
  *       extension runs — no tests, credentials, sources of the icons, or the
@@ -24,6 +26,7 @@ const root = path.join(ext, '..');
 const args = process.argv.slice(2);
 const libOnly = args.includes('--lib-only');
 const pack = args.includes('--pack');
+const watch = args.includes('--watch');
 function flag(name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; }
 const pemPath = flag('--pem');
 const outDir = flag('--out') || path.join(root, 'dist');
@@ -58,6 +61,24 @@ manifest.oauth2.client_id = local.client_id;
 manifest.key = local.key;
 fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 console.log('built extension/lib and extension/manifest.json');
+if (watch) {
+  // Re-run this script on every source change; the stamp tells the extension to reload.
+  const stamp = path.join(ext, 'dev-reload.json');
+  const skip = /(^|\/)(lib|manifest\.json|dev-reload\.json|test|node_modules)(\/|$)/;
+  let timer = null;
+  const rebuild = () => {
+    timer = null;
+    try { execFileSync(process.execPath, [__filename, oauthPath], { stdio: 'inherit' }); } catch (e) { return; }
+    fs.writeFileSync(stamp, JSON.stringify({ t: Date.now() }) + '\n');
+    console.log('dev-reload stamped');
+  };
+  const onChange = (_, file) => { if (file && skip.test(file)) return; clearTimeout(timer); timer = setTimeout(rebuild, 300); };
+  fs.watch(ext, { recursive: true }, onChange);
+  for (const f of ['Formula.gs', 'Trace.gs']) fs.watch(path.join(root, f), onChange);
+  rebuild();
+  console.log('watching extension/ and Formula.gs, Trace.gs — Ctrl+C to stop');
+  return;
+}
 if (!pack) process.exit(0);
 
 // Stage the shipping files in a clean directory so the zip cannot pick up

@@ -9,3 +9,4 @@ extension/*.pem
 extension/test/oauth.tmp.json
 dist/
 .playwright-mcp/
+extension/dev-reload.json

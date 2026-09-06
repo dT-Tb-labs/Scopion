@@ -4,6 +4,9 @@
  * token (chrome.identity is not available to content scripts). It holds no
  * state; every request carries its spreadsheet id.
  */
+// Dev-only self-reload (see dev-reload.js); the file is absent from the packed build.
+try { importScripts('dev-reload.js'); } catch (e) { /* not a dev build */ }
+
 var SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets/';
 /**
  * Reads use the manifest's default scope (spreadsheets.readonly), so the first
