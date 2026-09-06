@@ -1,5 +1,5 @@
 # Project Memory
-最終更新: 2026-09-06 (re-hide live check passed)
+最終更新: 2026-09-06 (wrapup — re-hide verified, dev self-reload shipped)
 
 ## 現在の状態
 Scopion = formula auditor for Google Sheets, an ACE (Excel VBA) port. Two builds:
