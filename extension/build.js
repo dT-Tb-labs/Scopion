@@ -73,7 +73,8 @@ if (watch) {
     console.log('dev-reload stamped');
   };
   const onChange = (_, file) => { if (file && skip.test(file)) return; clearTimeout(timer); timer = setTimeout(rebuild, 300); };
-  fs.watch(ext, { recursive: true }, onChange);
+  // Fixed, non-recursive watch set: recursive fs.watch hits EMFILE on macOS here.
+  for (const d of ['', '_locales/en', '_locales/ja', 'icons']) fs.watch(path.join(ext, d), onChange);
   for (const f of ['Formula.gs', 'Trace.gs']) fs.watch(path.join(root, f), onChange);
   rebuild();
   console.log('watching extension/ and Formula.gs, Trace.gs — Ctrl+C to stop');
