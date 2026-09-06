@@ -36,11 +36,16 @@ Facts here must match `extension/manifest.template.json`; change both together.
   - Screenshots `screenshot-1..N.png`: 1280×800, full bleed, real captures of
     the panel on the test spreadsheet (`sh docs/store/capture.sh N X Y` grabs
     the 1280×800 viewport region of the screen and resamples the Retina
-    capture). **Status 2026-09-05:** only `screenshot-1.png` exists (origin
-    row, INDEX/MATCH); its Sheets UI is Japanese and it shows the account
-    avatar and the mouse cursor. Before upload: retake with `?hl=en` on the
-    sheet URL for the EN listing (and `?hl=ja` for JA), mouse off-screen, and
-    add the cross-sheet walk, hidden-sheet flag and breadcrumb shots.
+    capture). **Status 2026-09-06:** `screenshot-1..4.png` exist, all from
+    the test spreadsheet with the Japanese Sheets UI (`?hl=en` does not
+    override the account language; the EN listing reuses them until the
+    account language is switched): 1 origin row, INDEX/MATCH; 2 Calc!B35
+    walked one step into Inputs!B6:B10 (range row, token colours, cross-sheet
+    bold); 3 the same walk on the hidden-sheet row (H flag, unhide notice);
+    4 Calc!B6 drilled into Model!B6 with the Growth name row (breadcrumbs).
+    Capture recipe: AppleScript `set bounds of window` to {0,39,1280,1016}
+    gives a 1280×800 viewport at X=0 Y=216; `screencapture` includes the
+    real cursor, so park it at the viewport's bottom-right corner first.
   - Small promo tile `promo-440x280.png`: icon + tagline, no screenshot;
     source `promo-tile.html`, rendered at a 440×280 viewport.
   - Marquee 1400×560: not made; add later if wanted.
