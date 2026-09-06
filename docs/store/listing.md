@@ -39,7 +39,7 @@ Facts here must match `extension/manifest.template.json`; change both together.
     capture). **Status 2026-09-06:** `screenshot-1..4.png` exist, all from
     the test spreadsheet with the Japanese Sheets UI (`?hl=en` does not
     override the account language; the EN listing reuses them until the
-    account language is switched): 1 origin row, INDEX/MATCH; 2 Calc!B35
+    account language is switched): 1 Calc!B12 origin row, INDEX/MATCH (retaken 2026-09-06 after restoring the formula, which had been cleared); 2 Calc!B35
     walked one step into Inputs!B6:B10 (range row, token colours, cross-sheet
     bold); 3 the same walk on the hidden-sheet row (H flag, unhide notice);
     4 Calc!B6 drilled into Model!B6 with the Growth name row (breadcrumbs).
