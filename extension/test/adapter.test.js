@@ -49,13 +49,17 @@ test('sheets and hidden state come from properties', () => {
 test('named ranges become getName/getRange, unbounded axes fill the grid, orphans are dropped', () => {
   const snap = new S.Snapshot(meta);
   const names = snap.getNamedRanges().map((n) => n.getName());
-  assert.deepEqual(names, ['Growth', 'Shift', 'WholeCol']);
+  assert.deepEqual(names, ['Growth', 'Shift', 'WholeCol', 'Base']);
   const growth = snap.getNamedRanges()[0].getRange();
   assert.equal(growth.getSheet().getName(), 'Inputs');
   assert.equal(growth.getA1Notation(), 'B1');
   const whole = snap.getNamedRanges()[2].getRange();
   assert.equal(whole.getRow(), 1); assert.equal(whole.getLastRow(), 1000);
   assert.equal(whole.getColumn(), 1); assert.equal(whole.getLastColumn(), 1);
+  // The API omits GridRange.sheetId when it is 0 (proto3 default): a name on the first sheet must still resolve.
+  const base = snap.getNamedRanges()[3].getRange();
+  assert.equal(base.getSheet().getName(), 'Model');
+  assert.equal(base.getA1Notation(), 'B1');
 });
 
 test('buildNamedRangeMap from Trace.gs works on the snapshot', () => {

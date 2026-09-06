@@ -9,6 +9,7 @@
     { "namedRangeId": "n1", "name": "Growth", "range": { "sheetId": 1, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 1, "endColumnIndex": 2 } },
     { "namedRangeId": "n2", "name": "Shift", "range": { "sheetId": 1, "startRowIndex": 2, "endRowIndex": 3, "startColumnIndex": 1, "endColumnIndex": 2 } },
     { "namedRangeId": "n3", "name": "WholeCol", "range": { "sheetId": 1, "startColumnIndex": 0, "endColumnIndex": 1 } },
-    { "namedRangeId": "n4", "name": "Orphan", "range": { "sheetId": 99, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": 1 } }
+    { "namedRangeId": "n4", "name": "Orphan", "range": { "sheetId": 99, "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": 1 } },
+    { "namedRangeId": "n5", "name": "Base", "range": { "startRowIndex": 0, "endRowIndex": 1, "startColumnIndex": 1, "endColumnIndex": 2 } }
   ]
 }

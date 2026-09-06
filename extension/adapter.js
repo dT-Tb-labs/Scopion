@@ -48,7 +48,8 @@ function Snapshot(meta) {
   this.named = [];
   var nrs = (meta && meta.namedRanges) || [];
   for (var n = 0; n < nrs.length; n++) {
-    var nr = nrs[n], g = nr.range || {}, sheet = this.byId[g.sheetId];
+    // GridRange.sheetId is omitted when it is 0 (proto3 default), so a name on the first sheet has none.
+    var nr = nrs[n], g = nr.range || {}, sheet = this.byId[g.sheetId || 0];
     if (!sheet) continue; // a name whose sheet is gone
     var r1 = (g.startRowIndex || 0) + 1, c1 = (g.startColumnIndex || 0) + 1;
     var r2 = g.endRowIndex === undefined || g.endRowIndex === null ? sheet.rowCount : g.endRowIndex;
