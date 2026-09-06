@@ -79,7 +79,8 @@ if (watch) {
   for (const d of ['', '_locales/en', '_locales/ja', 'icons']) {
     for (const f of fs.readdirSync(path.join(ext, d))) {
       const p = path.join(ext, d, f);
-      if (!skip.test(f) && fs.statSync(p).isFile()) files.push(p);
+      // Source files only: *.pem and oauth.local.json are credentials and may be unreadable here.
+      if (/\.(js|json|html|png)$/.test(f) && !skip.test(f) && f !== 'oauth.local.json' && fs.statSync(p).isFile()) files.push(p);
     }
   }
   for (const f of files) fs.watchFile(f, { interval: 500 }, (cur, prev) => { if (cur.mtimeMs !== prev.mtimeMs) onChange(); });
