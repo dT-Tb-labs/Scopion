@@ -19,13 +19,13 @@ Built for financial models
 • Range rows select the whole block and show its sum and count.
 • IMPORTRANGE rows open the source spreadsheet.
 • OFFSET, INDEX and INDIRECT are resolved from literals and single-cell values. What cannot be resolved is listed as unresolved with the reason — never silently dropped.
-• Hidden sheets are walked like any other. Sheets unhides a sheet when you jump into it; Scopion hides it again when you close the panel (except on an Excel file, where the panel asks you to re-hide by hand).
+• Hidden sheets are walked like any other. Sheets unhides a sheet when you jump into it; Scopion hides it again when you close the panel — that is the only thing it ever writes, and it asks for edit permission separately the first time it needs to (decline, and the panel tells you which sheets to re-hide by hand).
 
 Keys
 ↑ ↓ walk the references (the selection follows) · → new origin · ← / Backspace back · Enter close and stay · Esc / OK return to the start and close. Rebind the shortcut at chrome://extensions/shortcuts if another extension has it.
 
 What it accesses, and the one thing it writes
-Scopion reads the open spreadsheet through the Google Sheets API — sheet names, named ranges, and the cells the formula points at — only when you invoke it. The only change it ever makes is hiding again the sheets it had to unhide for the walk. It has no server: nothing is stored, logged or sent anywhere except to Google's API. Three display settings and the panel's last position live in your Chrome profile. Details in the privacy policy.
+Scopion reads the open spreadsheet through the Google Sheets API with read-only access — sheet names, named ranges, and the cells the formula points at — only when you invoke it. The only change it ever makes is hiding again the sheets it had to unhide for the walk, and it asks for edit access only the first time that is needed. It has no server: nothing is stored, logged or sent anywhere except to Google's API. Three display settings and the panel's last position live in your Chrome profile. Details in the privacy policy.
 
 Good to know
 • An Excel file opened in Sheets (.xlsx) has no API data: references and jumps work, values show as —, and hidden sheets you walked into stay visible until you re-hide them.

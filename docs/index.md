@@ -17,7 +17,7 @@ Built for financial models.
 - **Drill** — <kbd>→</kbd> makes the highlighted cell the new origin, <kbd>←</kbd> goes back; breadcrumbs show the trail.
 - **Blank inputs flagged** — an empty referenced cell is usually the error you were looking for.
 - **Honest about dynamic references** — `OFFSET`, `INDEX`, `INDIRECT` are resolved from literals and single-cell values; the rest is listed as unresolved, never dropped.
-- **One write, and only one** — Sheets unhides a hidden sheet when you jump into it; Scopion hides it again when the panel closes (on an Excel file it cannot, and says so). Nothing else is ever changed, and nothing leaves your browser except calls to Google's own API.
+- **One write, and only one** — Sheets unhides a hidden sheet when you jump into it; Scopion hides it again when the panel closes, asking for edit access only the first time that is needed (on an Excel file it cannot, and says so). Nothing else is ever changed, and nothing leaves your browser except calls to Google's own API.
 
 Scopion is a port of the Excel formula auditor generations of modellers relied on.
 
@@ -36,6 +36,6 @@ Scopion is a port of the Excel formula auditor generations of modellers relied o
 - **ドリルダウン** — <kbd>→</kbd> でハイライト中のセルを新しい起点に、<kbd>←</kbd> で戻る。経路はブレッドクラムで表示。
 - **空白入力を警告** — 参照先が空のセルは、たいてい探していた間違いそのもの。
 - **動的参照に正直** — `OFFSET`・`INDEX`・`INDIRECT` はリテラルと単一セルの値から解決し、残りは「未解決」と明示。黙って省かない。
-- **書き込みは一種類だけ** — ジャンプで表示状態になった非表示シートを、パネルを閉じるときに再び非表示へ（Excel ファイルでは戻せないため、その旨を表示）。それ以外は何も変更せず、Google の API 以外へデータは出ません。
+- **書き込みは一種類だけ** — ジャンプで表示状態になった非表示シートを、パネルを閉じるときに再び非表示へ。編集権限は初めて必要になったときにだけ求める（Excel ファイルでは戻せないため、その旨を表示）。それ以外は何も変更せず、Google の API 以外へデータは出ません。
 
 Scopion は、Excel で長年使われてきた数式監査ツールの移植です。

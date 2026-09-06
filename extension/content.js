@@ -175,7 +175,7 @@
       return audit(cell, SheetsDom.formula()).then(function (res) {
         S.walk = walkFrom(res, []);
         S.lastJump = { sheetName: res.origin.sheetName, a1: res.origin.a1 };
-        S.unhidden = [];
+        S.unhidden = []; S.rehideDeclined = false;
         setBusy(false);
         S.panel.open(SheetsDom.selectionRect(), S.savedPos);
         render();
@@ -273,14 +273,14 @@
    * snapshot) for the sheet ids.
    */
   function rehideUnhidden(stay) {
-    if (!S.unhidden.length || !S.snap || S.snap.dataless) return Promise.resolve();
+    if (!S.unhidden.length || !S.snap || S.snap.dataless || S.rehideDeclined) return Promise.resolve();
     var keep = stay ? SheetsDom.activeSheetName() : (S.walk ? walkRoot(S.walk).sheetName : null);
     var ids = S.unhidden.filter(function (n) { return n !== keep; })
       .map(function (n) { var s = S.snap.getSheetByName(n); return s ? s.getSheetId() : null; })
       .filter(function (id) { return id !== null && id !== undefined; });
-    S.unhidden = [];
-    if (!ids.length) return Promise.resolve();
-    return rpc({ type: 'scopion:rehide', spreadsheetId: S.spreadsheetId, sheetIds: ids });
+    if (!ids.length) { S.unhidden = []; return Promise.resolve(); }
+    // The first re-hide asks for the edit scope (background.js WRITE_SCOPES); the list is kept until it succeeds.
+    return rpc({ type: 'scopion:rehide', spreadsheetId: S.spreadsheetId, sheetIds: ids }).then(function () { S.unhidden = []; });
   }
 
   /** OK / Esc return to where the session started; Enter (stay=true) keeps the selection where the walk left it. */
@@ -290,13 +290,22 @@
     chrome.storage.local.set({ panelPos: S.panel.getPosition() });
     var warn = function (what) { return function (e) { console.warn('Scopion: ' + what + ': ' + (e && e.message ? e.message : e)); }; };
     var p = root ? SheetsDom.jump(root.sheetName, root.a1) : Promise.resolve();
-    // The panel must close even if the return jump or the re-hide fails — nobody sees a notice once it is gone.
+    function finish() {
+      S.panel.close();
+      SheetsDom.focusGrid(); // the list had the keyboard; give it back to the cells
+      S.walk = null; S.lastJump = null; S.busy = false; S.unhidden = [];
+    }
+    // The panel must close even if the return jump fails — nobody sees a notice once it is gone.
     p.catch(warn('could not return to the origin'))
-      .then(function () { return rehideUnhidden(!!stay); }).catch(warn('could not re-hide sheets'))
-      .then(function () {
-        S.panel.close();
-        SheetsDom.focusGrid(); // the list had the keyboard; give it back to the cells
-        S.walk = null; S.lastJump = null; S.busy = false;
+      .then(function () { return rehideUnhidden(!!stay); })
+      .then(finish, function (e) {
+        // The edit consent was declined (or the write failed): the sheets stay
+        // visible, the panel stays open to say so, and the next OK/Esc closes
+        // without asking again.
+        warn('could not re-hide sheets')(e);
+        S.rehideDeclined = true; S.busy = false;
+        S.panel.render(view({ rehideFailed: true }));
+        S.panel.focus();
       });
   }
 

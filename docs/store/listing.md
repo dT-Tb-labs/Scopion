@@ -66,9 +66,12 @@ Facts here must match `extension/manifest.template.json`; change both together.
     and draws the panel.
   - Host `https://sheets.googleapis.com/*` — the API calls above, from the
     service worker.
-  - OAuth scope `.../auth/spreadsheets` (not `.readonly`) — jumping into a
+  - OAuth scopes: `.../auth/spreadsheets.readonly` at install (manifest);
+    `.../auth/spreadsheets` requested **incrementally** (chrome.identity
+    `scopes` override) the first time a re-hide is needed — jumping into a
     hidden sheet makes Google Sheets unhide it; Scopion hides it again when
-    the panel closes. That `batchUpdate` is the only write.
+    the panel closes. That `batchUpdate` is the only write. Both scopes must
+    be listed on the GCP consent screen and both are sensitive → verification.
 - **Remote code:** No.
 - **Data usage:** collects *Website content* (spreadsheet cells and formulas,
   in memory while the panel is open); no other category. Not sold, not used

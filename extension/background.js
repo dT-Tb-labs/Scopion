@@ -5,6 +5,12 @@
  * state; every request carries its spreadsheet id.
  */
 var SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets/';
+/**
+ * Reads use the manifest's default scope (spreadsheets.readonly), so the first
+ * consent says "view" only. The one write — re-hiding sheets — asks for the
+ * edit scope incrementally, the first time it is actually needed.
+ */
+var WRITE_SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 var META_FIELDS = 'namedRanges,sheets.properties(sheetId,title,hidden,gridProperties(rowCount,columnCount))';
 var GRID_FIELDS = 'sheets(properties.sheetId,data(startRow,startColumn,rowData.values(effectiveValue,formattedValue,userEnteredValue)))';
 
@@ -41,9 +47,11 @@ function onboardingUrlFor(tab) {
  * Authorised fetch with a cached token; on 401 drop the token and retry once.
  * `interactive` (default true) allows the Google consent window when no token
  * is cached; the content script passes false after the user has declined once,
- * so a declined consent is not re-opened on every panel open.
+ * so a declined consent is not re-opened on every panel open. `scopes`
+ * (optional) overrides the manifest scopes for this call — WRITE_SCOPES for
+ * the re-hide.
  */
-function apiCall(url, init, deps, interactive) {
+function apiCall(url, init, deps, interactive, scopes) {
   var mayPrompt = interactive !== false;
   function call(token) {
     var headers = Object.assign({ Authorization: 'Bearer ' + token }, (init && init.headers) || {});
@@ -51,9 +59,9 @@ function apiCall(url, init, deps, interactive) {
   }
   function prompt(err) {
     if (!mayPrompt) throw new Error('not signed in: ' + (err && err.message ? err.message : err));
-    return deps.getToken(true);
+    return deps.getToken(true, scopes);
   }
-  return deps.getToken(false).catch(prompt)
+  return deps.getToken(false, scopes).catch(prompt)
     .then(function (token) {
       return call(token).then(function (res) {
         if (res.status !== 401) return res;
@@ -66,16 +74,18 @@ function apiCall(url, init, deps, interactive) {
     });
 }
 function apiGet(url, deps, interactive) { return apiCall(url, null, deps, interactive); }
-function apiPost(url, body, deps, interactive) {
-  return apiCall(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, deps, interactive);
+function apiPost(url, body, deps, interactive, scopes) {
+  return apiCall(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, deps, interactive, scopes);
 }
 
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
   var chromeDeps = {
     fetch: function (u, o) { return fetch(u, o); },
-    getToken: function (interactive) {
+    getToken: function (interactive, scopes) {
+      var details = { interactive: interactive };
+      if (scopes) details.scopes = scopes; // incremental consent for the write
       return new Promise(function (resolve, reject) {
-        chrome.identity.getAuthToken({ interactive: interactive }, function (result) {
+        chrome.identity.getAuthToken(details, function (result) {
           var token = result && typeof result === 'object' ? result.token : result;
           if (chrome.runtime.lastError || !token) reject(new Error(chrome.runtime.lastError ? chrome.runtime.lastError.message : 'no token'));
           else resolve(token);
@@ -93,7 +103,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     if (msg.type === 'scopion:meta') p = apiGet(metaUrl(msg.spreadsheetId), chromeDeps, interactive);
     else if (msg.type === 'scopion:rehide') {
       if (!msg.sheetIds || !msg.sheetIds.length) { sendResponse({ ok: true, data: null }); return true; }
-      p = apiPost(rehideUrl(msg.spreadsheetId), rehideBody(msg.sheetIds), chromeDeps, interactive);
+      p = apiPost(rehideUrl(msg.spreadsheetId), rehideBody(msg.sheetIds), chromeDeps, interactive, WRITE_SCOPES);
     }
     else if (msg.type === 'scopion:grid') {
       // An empty ranges list means "the whole spreadsheet" to the Sheets API,

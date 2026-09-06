@@ -32,8 +32,8 @@ test('build renders manifest.json from the template and the local oauth file', (
     assert.equal(m.commands['toggle-scopion'].description, '__MSG_cmdToggle__');
     assert.equal(m.oauth2.client_id, 'cid.apps.googleusercontent.com');
     assert.equal(m.key, 'MIIB');
-    // Read/write: the one write is re-hiding sheets the walk had to unhide.
-    assert.deepEqual(m.oauth2.scopes, ['https://www.googleapis.com/auth/spreadsheets']);
+    // Read-only at install; the edit scope for the one write (re-hiding sheets) is requested incrementally by background.js.
+    assert.deepEqual(m.oauth2.scopes, ['https://www.googleapis.com/auth/spreadsheets.readonly']);
     assert.equal(m.commands['toggle-scopion'].suggested_key.default, 'Ctrl+Shift+A');
     // Chrome turns "Ctrl" into Command on macOS; MacCtrl is the Control key the listing and onboarding promise.
     assert.equal(m.commands['toggle-scopion'].suggested_key.mac, 'MacCtrl+Shift+A');

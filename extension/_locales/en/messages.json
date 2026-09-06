@@ -11,7 +11,7 @@
   "obStep3": { "message": "Press Ctrl+Shift+A, or click the Scopion icon in the toolbar." },
   "obReload": { "message": "This spreadsheet was open before Scopion was installed. Reload the tab, then press Ctrl+Shift+A." },
   "obConsentTitle": { "message": "The Google sign-in prompt, explained" },
-  "obConsentBody": { "message": "The first trace asks you to sign in and grant access to your spreadsheets. Scopion reads the sheet through the Google Sheets API to show values, named ranges and hidden sheets. It makes exactly one kind of change: when the walk enters a hidden sheet, Sheets unhides it, and Scopion hides it again when you close the panel (on an Excel file it cannot, and the panel says so). Nothing is sent anywhere except to Google's own API." },
+  "obConsentBody": { "message": "The first trace asks you to sign in and grant read-only access to your spreadsheets. Scopion reads the sheet through the Google Sheets API to show values, named ranges and hidden sheets. It makes exactly one kind of change: when the walk enters a hidden sheet, Sheets unhides it, and Scopion hides it again when you close the panel — for that it asks for edit access separately, the first time it is needed; decline and it tells you which sheets to re-hide by hand. Nothing is sent anywhere except to Google's own API." },
   "obKeysTitle": { "message": "Keys" },
   "obKeyWalk": { "message": "↑ ↓  walk the references; the selection follows" },
   "obKeyDrill": { "message": "→  make the highlighted cell the new origin" },

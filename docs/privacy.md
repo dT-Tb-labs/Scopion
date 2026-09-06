@@ -21,8 +21,10 @@ to it.
   named ranges and the values of the cells the formula references. Nothing is
   read until you invoke it, and only from the spreadsheet you invoked it on.
 - **Your Google account, for authorisation only.** Scopion uses Chrome's
-  identity API to obtain an OAuth token for the `spreadsheets` scope so that the
-  Sheets API will answer. Scopion never sees your password and does not read
+  identity API to obtain an OAuth token for the `spreadsheets.readonly` scope
+  so that the Sheets API will answer. The first time it needs to hide a sheet
+  again (below) it asks, separately, for the `spreadsheets` edit scope; you can
+  decline and re-hide by hand. Scopion never sees your password and does not read
   your profile, email address or Drive file list.
 - **Preferences.** Three display settings (show hidden sheets, show range
   names, show external references) are stored with `chrome.storage.sync`; the
@@ -32,7 +34,9 @@ to it.
 ## What Scopion writes
 
 The only change Scopion makes to a spreadsheet is to **hide again the sheets it
-had to unhide** so that you could jump into them, when you close the panel.
+had to unhide** so that you could jump into them, when you close the panel —
+and only after you have granted the edit scope when first asked; if you
+decline, the panel tells you which sheets to re-hide by hand.
 It never edits cell contents, formatting or sharing. For an Excel file opened
 in Sheets the Sheets API is unavailable, so Scopion cannot re-hide: the panel
 says so and asks you to re-hide by hand.

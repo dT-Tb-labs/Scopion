@@ -54,7 +54,7 @@ function fakeDeps(statuses, tokens) {
       log.push(['fetch', opts.headers.Authorization, status]);
       return { status, ok: status >= 200 && status < 300, json: async () => ({ status }), text: async () => 'body ' + status };
     },
-    getToken: async (interactive) => { log.push(['getToken', interactive]); const t = tokens.shift(); if (!t) throw new Error('no token'); return t; },
+    getToken: async (interactive, scopes) => { log.push(scopes ? ['getToken', interactive, scopes] : ['getToken', interactive]); const t = tokens.shift(); if (!t) throw new Error('no token'); return t; },
     removeToken: async (t) => { log.push(['removeToken', t]); }
   };
 }
@@ -90,14 +90,18 @@ test('after a declined consent the API is tried silently: no interactive prompt,
   assert.deepEqual(deps401.log, [['getToken', false], ['fetch', 'Bearer stale', 401], ['removeToken', 'stale']]);
 });
 
-test('re-hide posts one updateSheetProperties per sheet with the token', async () => {
+test('re-hide posts one updateSheetProperties per sheet with a token carrying the edit scope; reads use the default scope', async () => {
   const B = load();
-  const seen = [];
+  const seen = [], scopesAsked = [];
   const deps = {
     fetch: async (url, opts) => { seen.push([url, opts.method, opts.headers['Content-Type'], opts.headers.Authorization, JSON.parse(opts.body)]); return { status: 200, ok: true, json: async () => ({}), text: async () => '' }; },
-    getToken: async () => 'tok', removeToken: async () => {}
+    getToken: async (interactive, scopes) => { scopesAsked.push(scopes); return 'tok'; }, removeToken: async () => {}
   };
-  await B.apiPost(B.rehideUrl('abc'), B.rehideBody([2, 5]), deps);
+  await B.apiPost(B.rehideUrl('abc'), B.rehideBody([2, 5]), deps, true, B.WRITE_SCOPES);
+  // JSON compare: WRITE_SCOPES is an Array from the vm realm, so deepStrictEqual would fail on the prototype.
+  assert.equal(JSON.stringify(scopesAsked), JSON.stringify([['https://www.googleapis.com/auth/spreadsheets']]));
+  await B.apiGet(B.metaUrl('abc'), { ...deps, fetch: async () => ({ status: 200, ok: true, json: async () => ({}) }) });
+  assert.equal(scopesAsked[1], undefined); // manifest default (spreadsheets.readonly)
   assert.deepEqual(seen[0].slice(0, 4), ['https://sheets.googleapis.com/v4/spreadsheets/abc:batchUpdate', 'POST', 'application/json', 'Bearer tok']);
   assert.deepEqual(seen[0][4], { requests: [
     { updateSheetProperties: { properties: { sheetId: 2, hidden: true }, fields: 'hidden' } },

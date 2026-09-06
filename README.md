@@ -53,7 +53,8 @@ it is listed; the steps below are for running it from source.
    ```
 2. **Google Cloud**: create a project → *APIs & Services ▸ Library* → enable
    **Google Sheets API** → *OAuth consent screen*: External, publishing status
-   *Testing*, add your Google account as a test user, add the scope
+   *Testing*, add your Google account as a test user, add both scopes
+   `https://www.googleapis.com/auth/spreadsheets.readonly` and
    `https://www.googleapis.com/auth/spreadsheets` → *Credentials ▸ Create
    credentials ▸ OAuth client ID*, application type **Chrome Extension**, Item ID =
    the extension ID from step 1. Copy the client ID.
@@ -71,8 +72,9 @@ Keys: ↑/↓ walk (the selection follows; row 0 is the origin), → = New Origi
 where the walk left you, Esc/OK = return to the origin and close. The toolbar
 icon opens Scopion too. Hidden sheets are walked like any other: Sheets unhides
 a sheet when you jump into it, and Scopion hides it again when you close — that
-re-hide is the only write it makes, and the reason the OAuth scope is
-`spreadsheets` rather than read-only. The breadcrumb row under the list shows
+re-hide is the only write it makes. Reads run under `spreadsheets.readonly`;
+the `spreadsheets` edit scope is requested incrementally the first time a
+re-hide is needed, and declining it leaves the sheets visible with a notice. The breadcrumb row under the list shows
 every origin you drilled through; click one to go back there. An .xlsx opened
 in Sheets is refused by the Sheets API: Scopion then
 runs from the page alone — references and jumps work, values show as "—".
